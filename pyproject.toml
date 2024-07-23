@@ -3,14 +3,18 @@ name = "pss-fleet-data-importer"
 version = "0.1.0"
 description = "A tool to import PSS Fleet Data from google drive to the PSS Fleet Data API."
 authors = [
-    { name = "The worst.", email = "5472896+Zukunftsmusik@users.noreply.github.com" }
+    { name = "The worst.", email = "theworstpss@gmail.com" }
 ]
 dependencies = [
-    "pss-fleet-data-client>=0.1.1",
-    "sqlmodel>=0.0.20",
     "alembic>=1.13.2",
     "asyncpg>=0.29.0",
+    "pssapi>=0.5.1",
+    "pss-fleet-data-client>=0.1.1",
     "PyDrive2>=1.20.0",
+    "sqlmodel>=0.0.20",
+    "typer>=0.12.3",
+    "sqlalchemy-utils>=0.41.2",
+    "psycopg2-binary>=2.9.9",
 ]
 readme = "README.md"
 requires-python = ">= 3.12"
@@ -33,6 +37,10 @@ dev-dependencies = [
     "pytest-vcr>=1.0.2",
 ]
 
+[tool.pytest.ini_options]
+pythonpath = [
+  ".",
+]
 
 [tool.autoflake]
 in-place = true
@@ -53,5 +61,5 @@ lines_after_imports = 2
 
 [tool.vulture]
 min_confidence = 100
-paths = ["./src/app"]
+paths = ["./src/importer"]
 sort_by_size = true
