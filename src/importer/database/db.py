@@ -1,6 +1,7 @@
 import io
 import logging
 import logging.config
+from contextlib import AbstractAsyncContextManager, asynccontextmanager
 from typing import AsyncGenerator, Optional
 
 import alembic.command
@@ -11,6 +12,27 @@ from sqlalchemy.ext.asyncio import AsyncConnection, AsyncEngine, create_async_en
 from sqlmodel.ext.asyncio.session import AsyncSession
 
 from ..core.config import CONFIG
+
+
+class AsyncAutoRollbackSession(AbstractAsyncContextManager):
+    def __init__(self, async_engine: AsyncEngine):
+        self.__async_engine = async_engine
+        self.__connection: AsyncConnection = None
+        self.session: AsyncSession = None
+        self.__logger: logging.Logger = CONFIG.logger.getChild(AsyncAutoRollbackSession.__name__)
+
+    async def __aenter__(self):
+        self.__connection = await self.__async_engine.connect()
+        async with AsyncSession(bind=self.__connection) as async_session:
+            self.session = async_session
+            return self.session
+
+    async def __aexit__(self, exc_type, exception, traceback):
+        if exception and isinstance(exception, DBAPIError):
+            self.__logger.error("An error occured during a database transaction. Rolling back session.", exc_info=exception, stack_info=True)
+            await self.session.rollback()
+        await self.session.close()
+        await self.__connection.close()
 
 
 class Database:
@@ -56,11 +78,16 @@ class Database:
                 except DBAPIError as session_exception:
                     await async_session.rollback()
                     raise session_exception
+                except KeyboardInterrupt as exc:
+                    await async_session.rollback()
+                    raise exc
                 finally:
                     await async_session.close()
         except DBAPIError as connection_exception:
-            print(connection_exception)
+            self.logger.error("An error occured during a database transaction.", exc_info=connection_exception, stack_info=True)
             raise connection_exception
+        except KeyboardInterrupt as exc:
+            raise exc
         finally:
             await connection.close()
 
@@ -119,5 +146,6 @@ DATABASE = Database(CONFIG.db_async_connection_str, CONFIG.db_sync_connection_st
 
 
 __all__ = [
+    AsyncAutoRollbackSession.__name__,
     "DATABASE",
 ]
