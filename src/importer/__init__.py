@@ -1,9 +1,9 @@
-from . import commands, core, models
+from . import core, database, models
 
 
 __all__ = [
-    commands.__name__,
     core.__name__,
+    database.__name__,
     models.__name__,
 ]
 
