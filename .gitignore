@@ -1,5 +1,7 @@
-# Credentials
+# Google Drive Auth
+client_secrets.json
 credentials.json
+settings.yaml
 
 # VS Code
 .vscode/*
