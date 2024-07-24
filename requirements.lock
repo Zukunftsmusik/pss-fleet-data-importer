@@ -34,7 +34,7 @@ charset-normalizer==3.3.2
     # via requests
 click==8.1.7
     # via typer
-cryptography==42.0.8
+cryptography==43.0.0
     # via pyopenssl
 frozenlist==1.4.1
     # via aiohttp
@@ -87,7 +87,7 @@ protobuf==5.27.2
     # via google-api-core
     # via googleapis-common-protos
     # via proto-plus
-pss-fleet-data-client==0.1.1
+pss-fleet-data-client==0.2.0
 pssapi==0.5.1
     # via pss-fleet-data-client
 psycopg2-binary==2.9.9
@@ -108,7 +108,7 @@ pydantic-core==2.20.1
 pydrive2==1.20.0
 pygments==2.18.0
     # via rich
-pyopenssl==24.1.0
+pyopenssl==24.2.1
     # via pydrive2
 pyparsing==3.1.2
     # via httplib2
@@ -140,7 +140,7 @@ sqlalchemy==2.0.31
     # via sqlalchemy-utils
     # via sqlmodel
 sqlalchemy-utils==0.41.2
-sqlmodel==0.0.20
+sqlmodel==0.0.21
 typer==0.12.3
 typing-extensions==4.12.2
     # via alembic
