@@ -6,8 +6,9 @@ from sqlmodel import Field, SQLModel
 
 class CollectionFileBase(SQLModel):
     id: int = Field(primary_key=True, index=True, default=None)
-    file_name: str = Field(index=True)
-    timestamp: datetime = Field(index=True)
+    gdrive_file_id: str = Field(index=True, unique=True)
+    file_name: str = Field(index=True, unique=True)
+    timestamp: datetime = Field(index=True, unique=True)
     downloaded_at: Optional[datetime] = Field(default=None, nullable=True)
     imported_at: Optional[datetime] = Field(default=None, nullable=True)
 
