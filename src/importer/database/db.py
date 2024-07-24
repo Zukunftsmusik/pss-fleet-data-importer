@@ -1,7 +1,7 @@
 import io
 import logging
 import logging.config
-from contextlib import AbstractAsyncContextManager, asynccontextmanager
+from contextlib import AbstractAsyncContextManager
 from typing import AsyncGenerator, Optional
 
 import alembic.command

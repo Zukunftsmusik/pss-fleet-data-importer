@@ -1,15 +1,9 @@
-import calendar
-import io
 import json
 import logging
-import os
-import random
-import time
 import urllib.parse
-from datetime import datetime, timedelta, timezone
+from datetime import datetime
 from pathlib import Path
-from threading import Lock
-from typing import Generator, Optional, Union
+from typing import Generator, Optional
 
 import pydrive2.auth
 import pydrive2.drive

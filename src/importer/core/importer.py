@@ -13,7 +13,7 @@ from ..database.db import AsyncAutoRollbackSession, Database
 from ..models import CollectionFileDB
 from . import CONFIG, utils
 from .config import Config
-from .gdrive import GoogleDriveClient, GoogleDriveFile, GoogleDriveFileList
+from .gdrive import GoogleDriveClient, GoogleDriveFile
 
 
 if CONFIG.debug_mode:
