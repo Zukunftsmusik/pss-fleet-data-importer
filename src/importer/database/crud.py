@@ -2,7 +2,7 @@ from datetime import datetime
 from typing import Optional
 
 from sqlalchemy.sql.operators import is_, is_not
-from sqlmodel import asc, select
+from sqlmodel import asc, desc, select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
 from ..core import utils
@@ -13,7 +13,7 @@ async def delete_collection_file(session: AsyncSession, collection_file_id: int)
     """Attempts to delete the CollectionFile with the provided `collection_file_id`.
 
     Args:
-        session (Session): The database session to use.
+        session (AsyncSession): The database session to use.
         collection_file_id (int): The `id` of the CollectionFile to delete.
 
     Returns:
@@ -34,7 +34,7 @@ async def get_collection_file(session: AsyncSession, collection_file_id: int) ->
     """Retrieves the CollectionFile with the specified `collection_file_id`.
 
     Args:
-        session (Session): The database session to use.
+        session (AsyncSession): The database session to use.
         collection_file_id (int): The `collection_file_id` of the CollectionFile to retrieve.
 
     Returns:
@@ -45,15 +45,31 @@ async def get_collection_file(session: AsyncSession, collection_file_id: int) ->
         return collection_file
 
 
-async def get_collection_file_by_name(session: AsyncSession, file_name: str) -> Optional[CollectionFileDB]:
-    """Retrieves the CollectionFile with the given `collected_at` datetime.
+async def get_collection_file_by_gdrive_file_id(session: AsyncSession, gdrive_file_id: str) -> Optional[CollectionFileDB]:
+    """Retrieves the CollectionFile with the given `gdrive_file_id`.
 
     Args:
-        session (Session): The database session to use.
-        name (str): The `name` of the CollectionFile to look for.
+        session (AsyncSession): The database session to use.
+        gdrive_file_id (str): The `gdrive_file_id` of the CollectionFile to look for.
 
     Returns:
-        bool: The CollectionFile with the specified `name` value, if such a CollectionFile exists in the database. Else, `None`.
+        Optional[CollectionFileDB]: The CollectionFile with the specified `gdrive_file_id` value, if such a CollectionFile exists in the database. Else, `None`.
+    """
+    async with session:
+        collection_query = select(CollectionFileDB).where(CollectionFileDB.gdrive_file_id == gdrive_file_id)
+        collection = (await session.exec(collection_query)).first()
+        return collection
+
+
+async def get_collection_file_by_name(session: AsyncSession, file_name: str) -> Optional[CollectionFileDB]:
+    """Retrieves the CollectionFile with the given `file_name`.
+
+    Args:
+        session (AsyncSession): The database session to use.
+        file_name (str): The `file_name` of the CollectionFile to look for.
+
+    Returns:
+        Optional[CollectionFileDB]: The CollectionFile with the specified `file_name` value, if such a CollectionFile exists in the database. Else, `None`.
     """
     async with session:
         collection_query = select(CollectionFileDB).where(CollectionFileDB.file_name == file_name)
@@ -65,11 +81,11 @@ async def get_collection_file_by_timestamp(session: AsyncSession, timestamp: dat
     """Retrieves the CollectionFile with the given `timestamp` datetime.
 
     Args:
-        session (Session): The database session to use.
+        session (AsyncSession): The database session to use.
         timestamp (datetime): The `timestamp` of the CollectionFile to look for.
 
     Returns:
-        bool: The CollectionFile with the specified `timestamp` value, if such a CollectionFile exists in the database. Else, `None`.
+        Optional[CollectionFileDB]: The CollectionFile with the specified `timestamp` value, if such a CollectionFile exists in the database. Else, `None`.
     """
     timestamp = utils.remove_timezone(timestamp)
 
@@ -83,7 +99,7 @@ async def get_collection_files(session: AsyncSession, downloaded: Optional[bool]
     """Retrieves CollectionFiles meeting the specified criteria, ordered ascending by `CollectionFileDB.timestamp`.
 
     Args:
-        session (Session): The database session to use.
+        session (AsyncSession): The database session to use.
         downloaded (bool, optional): If specified returns only CollectionFiles that have already been downloaded or not.
         imported (bool, optional): If specified returns only CollectionFiles that have already been imported or not.
 
@@ -107,11 +123,27 @@ async def get_collection_files(session: AsyncSession, downloaded: Optional[bool]
         return list(results.all())
 
 
+async def get_latest_collection_file(session: AsyncSession) -> Optional[CollectionFileDB]:
+    """Retrieves the CollectionFile with the most recent `timestamp`.
+
+    Args:
+        session (AsyncSession): The database session to use.
+
+    Returns:
+        Optional[CollectionFileDB]: The CollectionFile with the most recent `timestamp` or `None` if the database is empty.
+    """
+    async with session:
+        query = select(CollectionFileDB).order_by(desc(CollectionFileDB.timestamp)).limit(1)
+
+        result = await session.exec(query)
+        return result.first()
+
+
 async def save_collection_file(session: AsyncSession, collection_file: CollectionFileDB) -> CollectionFileDB:
     """Inserts a CollectionFile into the database or updates an existing one.
 
     Args:
-        session (Session): The database session to use.
+        session (AsyncSession): The database session to use.
         collection_file (CollectionFileDB): The CollectionFile to be saved.
 
     Returns:
