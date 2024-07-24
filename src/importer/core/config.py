@@ -2,21 +2,36 @@ import logging
 import logging.config
 import os
 import time
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import datetime, timezone
+from pathlib import Path
 from typing import Optional
 
 from . import logger
 
 
-@dataclass()
+@dataclass(frozen=True)
 class Config:
     # Basic settings
     app_name: str = "importer"
-    default_api_server_url: str = "https://fleetdata.dolores2.xyz"
-    default_gdrive_folder_id: str = "10wOZgAQk_0St2Y_jC3UW497LVpBNxWmP"
     pss_start_date: datetime = datetime(2016, 1, 6, tzinfo=timezone.utc)
     earliest_data_date: datetime = datetime(2019, 10, 10, tzinfo=timezone.utc)
+    temp_download_folder: Path = Path("./downloads")
+
+    # PSS Fleet Data API
+    api_default_server_url: str = os.getenv("FLEET_DATA_API_URL", "https://fleetdata.dolores2.xyz")
+    api_key: Optional[str] = os.getenv("FLEET_DATA_API_KEY")
+
+    # Google Drive
+    gdrive_project_id: str = os.getenv("GDRIVE_SERVICE_PROJECT_ID")
+    gdrive_private_key_id: str = os.getenv("GDRIVE_SERVICE_PRIVATE_KEY_ID")
+    gdrive_private_key: str = os.getenv("GDRIVE_SERVICE_PRIVATE_KEY")
+    gdrive_client_email: str = os.getenv("GDRIVE_SERVICE_CLIENT_EMAIL")
+    gdrive_client_id: str = os.getenv("GDRIVE_SERVICE_CLIENT_ID")
+    gdrive_scopes: list[str] = field(default_factory=lambda: ["https://www.googleapis.com/auth/drive"])
+    gdrive_folder_id: str = os.getenv("GDRIVE_FOLDER_ID", "10wOZgAQk_0St2Y_jC3UW497LVpBNxWmP")
+    gdrive_service_account_file_path: str = "client_secrets.json"
+    gdrive_settings_file_path: str = "settings.yaml"
 
     # Flags
     debug_mode: bool = os.getenv("DEBUG_MODE", "false").lower() == "true"
