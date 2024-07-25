@@ -252,8 +252,10 @@ class Importer:
 
             if collection.collection_id:
                 collection_file.imported_at = datetime.now(tz=timezone.utc)
-                session = await Database.get_session()
-                collection_file = await crud.save_collection_file(session, collection_file)
+                async with AsyncAutoRollbackSession as session:
+                    collection_file = await crud.save_collection_file(session, collection_file)
+
+                file_path.unlink(missing_ok=True)
 
             import_queue.task_done()
             raise NotImplementedError()

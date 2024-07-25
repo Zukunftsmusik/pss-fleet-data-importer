@@ -19,7 +19,7 @@ async def do_import():
             api_server_url=CONFIG.api_default_server_url,
             api_key=CONFIG.api_key,
         )
-        await importer.run_bulk_import(modified_after=datetime(2019, 10, 31), modified_before=datetime(2019, 11, 1))
+        await importer.run_bulk_import(modified_after=datetime(2019, 10, 1), modified_before=datetime(2019, 11, 1))
         await importer.run_import_loop()
     except KeyboardInterrupt:
         CONFIG.logger.warn("\nAborted by user, exiting.")
