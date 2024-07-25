@@ -7,6 +7,7 @@ from pathlib import Path
 from typing import Optional
 
 from pss_fleet_data import PssFleetDataClient
+from pss_fleet_data.core.exceptions import ConflictError
 
 from ..database import crud
 from ..database.db import AsyncAutoRollbackSession, Database
@@ -126,30 +127,40 @@ class Importer:
                 self.__database,
                 self.__gdrive_client,
                 self.__config.temp_download_folder,
+                self.logger,
             )
         )
         return task
 
-    def start_bulk_imports(self, import_queue: queue.Queue) -> asyncio.Task[None]:
+    def start_bulk_imports(self) -> asyncio.Task[None]:
         self.set_bulk_imports_running(True)
         self.logger.info("Starting import worker...")
 
-        task = asyncio.create_task(self.worker_import(import_queue))
+        task = asyncio.create_task(
+            self.worker_import(
+                self.__import_bulk_queue,
+                self.__database,
+                self.__api_key,
+                self.__fleet_data_client,
+                self.logger,
+            )
+        )
         return task
 
     async def run_bulk_import(self, modified_after: Optional[datetime] = None, modified_before: Optional[datetime] = None):
         gdrive_files = self.get_gdrive_file_list(modified_after, modified_before)
 
-        # Fill Queue
         self.logger.debug("Filling download queue.")
         for gdrive_file in gdrive_files:
             self.__download_bulk_queue.put(gdrive_file)
 
         bulk_downloads_task = self.start_bulk_downloads()
-        # bulk_imports_handler = self.start_bulk_imports(self.__import_bulk_queue)
+        bulk_imports_task = self.start_bulk_imports()
 
         await bulk_downloads_task
-        # bulk_imports_handler.join()
+        await bulk_imports_task
+
+        self.logger.info("Finished bulk import.")
 
     async def run_import_loop(self):
         # Get latest file in DB
@@ -167,8 +178,11 @@ class Importer:
         database: Database,
         gdrive_client: GoogleDriveClient,
         target_dir: Path,
+        parent_logger: logging.Logger,
     ):
+        logger = parent_logger.parent.getChild("downloadWorker")
         target_dir.mkdir(parents=True, exist_ok=True)
+        logger.info("Downloading to directory: %s", target_dir)
 
         if self.__config.debug_mode:
             perf_all_start = perf_counter()
@@ -188,7 +202,7 @@ class Importer:
             file_name: str = gdrive_file["title"]
             gdrive_file_id: str = gdrive_file["id"]
             timestamp = datetime.strptime(file_name, "pss-top-100_%Y%m%d-%H%M%S.json")
-            self.logger.debug("Downloading file '%s' with ID '%s'.", file_name, gdrive_file_id)
+            logger.debug("Downloading with ID '%s' to: %s", gdrive_file_id, file_name)
 
             async with AsyncAutoRollbackSession(database.async_engine) as session:
                 collection_file = await self.get_collection_file_db(database, gdrive_file_id, file_name, timestamp)
@@ -197,6 +211,7 @@ class Importer:
             if target_file_path.exists():
                 downloaded_file_path = target_file_path
             else:
+                # TODO: Use thread pool (X threads), put all files into a list, fill 2 queues with that list (download, import). Download worker will take up to X at a time and download them. Importer will take 1 at a time and import to keep collection order intact.
                 downloaded_file_path = gdrive_client.download_file(gdrive_file, target_dir)
 
             if downloaded_file_path:
@@ -208,13 +223,13 @@ class Importer:
 
             download_queue.task_done()
 
-            self.logger.debug("Downloaded file '%s' with ID '%s' to: %s", file_name, gdrive_file_id, downloaded_file_path)
+            logger.debug("Downloaded with ID '%s' to: %s", gdrive_file_id, downloaded_file_path.absolute())
             if self.__config.debug_mode:
-                self.logger.debug("Time elapsed: %.4f seconds", perf_counter() - perf_start)
+                logger.debug("Time elapsed: %.4f seconds", perf_counter() - perf_start)
 
         download_queue.join()
         self.set_bulk_downloads_running(False)
-        self.logger.info("Download worker finished.")
+        parent_logger.info("Download worker finished.")
 
         if self.__config.debug_mode:
             total_seconds = perf_counter() - perf_all_start
@@ -236,7 +251,16 @@ class Importer:
             collection_file = await crud.save_collection_file(session, collection_file)
             return collection_file
 
-    async def worker_import(self, import_queue: queue.Queue, api_key: str, fleet_data_client: PssFleetDataClient):
+    async def worker_import(
+        self,
+        import_queue: queue.Queue,
+        database: Database,
+        api_key: str,
+        fleet_data_client: PssFleetDataClient,
+        parent_logger: logging.Logger,
+    ):
+        logger = parent_logger.parent.getChild("importWorker")
+
         while True:
             file_path: Path
             collection_file: CollectionFileDB
@@ -245,21 +269,26 @@ class Importer:
             except queue.Empty:
                 if not self.get_bulk_download_running():
                     break
-                asyncio.sleep(1)
+                await asyncio.sleep(1)
+                continue
 
-            self.logger.debug("Importing file '%s' to Fleet Data API.", file_path)
-            collection = await fleet_data_client.upload_collection(file_path, api_key=api_key)
+            logger.debug("Importing file: %s", file_path)
 
-            if collection.collection_id:
-                collection_file.imported_at = datetime.now(tz=timezone.utc)
-                async with AsyncAutoRollbackSession as session:
+            try:
+                collection = await fleet_data_client.upload_collection(str(file_path), api_key=api_key)
+                logger.debug("Imported file (Collection ID: %i): %s", collection.collection_id, file_path)
+            except ConflictError:
+                logger.info("Skipped file (Collection already exists): %s", file_path)
+                collection = None
+
+            if collection:
+                collection_file.imported_at = utils.remove_timezone(datetime.now(tz=timezone.utc))
+                async with AsyncAutoRollbackSession(database.async_engine) as session:
                     collection_file = await crud.save_collection_file(session, collection_file)
 
                 file_path.unlink(missing_ok=True)
 
             import_queue.task_done()
-            raise NotImplementedError()
 
         self.set_bulk_imports_running(False)
-        self.logger.info("Import worker finished.")
-        self.logger.info("Import worker finished.")
+        parent_logger.info("Import worker finished.")

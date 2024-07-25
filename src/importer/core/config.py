@@ -36,6 +36,7 @@ class Config:
     # Flags
     debug_mode: bool = os.getenv("DEBUG_MODE", "false").lower() == "true"
     in_github_actions: bool = os.getenv("GITHUB_ACTIONS", "false").lower() == "true"  # True if in github actions
+    keep_downloaded_files: bool = os.getenv("KEEP_DOWNLOADED_FILES", "false").lower() == "true"
     reinitialize_database_on_startup: bool = os.getenv("REINITIALIZE_DATABASE", "false").lower() == "true"
 
     # Database
