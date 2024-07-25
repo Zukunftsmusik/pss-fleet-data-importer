@@ -170,12 +170,18 @@ class Importer:
     ):
         target_dir.mkdir(parents=True, exist_ok=True)
 
+        if self.__config.debug_mode:
+            perf_all_start = perf_counter()
+            file_count = 0
+
         while True:
             if self.__config.debug_mode:
                 perf_start = perf_counter()
 
             try:
                 gdrive_file: GoogleDriveFile = download_queue.get(block=False)
+                if self.__config.debug_mode:
+                    file_count += 1
             except queue.Empty:
                 break
 
@@ -187,7 +193,6 @@ class Importer:
             async with AsyncAutoRollbackSession(database.async_engine) as session:
                 collection_file = await self.get_collection_file_db(database, gdrive_file_id, file_name, timestamp)
 
-            # TODO: Before downloading the file, check if already exists on disk
             target_file_path = target_dir.joinpath(file_name)
             if target_file_path.exists():
                 downloaded_file_path = target_file_path
@@ -210,6 +215,12 @@ class Importer:
         download_queue.join()
         self.set_bulk_downloads_running(False)
         self.logger.info("Download worker finished.")
+
+        if self.__config.debug_mode:
+            total_seconds = perf_counter() - perf_all_start
+            self.logger.debug(
+                "Downloading %i files took %.4f seconds (%.4f seconds per file).", file_count, total_seconds, total_seconds / file_count
+            )
 
     async def get_collection_file_db(self, database: Database, gdrive_file_id: str, file_name: str, timestamp: datetime) -> CollectionFileDB:
         async with AsyncAutoRollbackSession(database.async_engine) as session:
