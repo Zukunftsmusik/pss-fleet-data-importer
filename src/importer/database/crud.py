@@ -139,6 +139,38 @@ async def get_latest_collection_file(session: AsyncSession) -> Optional[Collecti
         return result.first()
 
 
+async def get_latest_downloaded_collection_file(session: AsyncSession) -> Optional[CollectionFileDB]:
+    """Retrieves the CollectionFile with the most recent `timestamp`, which has already been downloaded.
+
+    Args:
+        session (AsyncSession): The database session to use.
+
+    Returns:
+        Optional[CollectionFileDB]: The CollectionFile with the most recent `timestamp`, which has already been downloaded, or `None` if the database is empty.
+    """
+    async with session:
+        query = select(CollectionFileDB).where(is_not(CollectionFileDB.downloaded_at, None)).order_by(desc(CollectionFileDB.timestamp)).limit(1)
+
+        result = await session.exec(query)
+        return result.first()
+
+
+async def get_latest_imported_collection_file(session: AsyncSession) -> Optional[CollectionFileDB]:
+    """Retrieves the CollectionFile with the most recent `timestamp`, which has already been imported.
+
+    Args:
+        session (AsyncSession): The database session to use.
+
+    Returns:
+        Optional[CollectionFileDB]: The CollectionFile with the most recent `timestamp`, which has already been imported, or `None` if the database is empty.
+    """
+    async with session:
+        query = select(CollectionFileDB).where(is_not(CollectionFileDB.imported_at, None)).order_by(desc(CollectionFileDB.timestamp)).limit(1)
+
+        result = await session.exec(query)
+        return result.first()
+
+
 async def save_collection_file(session: AsyncSession, collection_file: CollectionFileDB) -> CollectionFileDB:
     """Inserts a CollectionFile into the database or updates an existing one.
 

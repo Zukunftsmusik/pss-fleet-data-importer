@@ -1,5 +1,15 @@
-from datetime import datetime
+from datetime import datetime, timedelta, timezone
 from typing import Optional
+
+
+def get_next_full_hour(now: Optional[datetime] = None) -> datetime:
+    now = remove_timezone(now or get_now())
+    result = now.replace(minute=0, second=0, microsecond=0) + timedelta(hours=1)
+    return result
+
+
+def get_now() -> datetime:
+    return remove_timezone(datetime.now(tz=timezone.utc))
 
 
 def remove_timezone(dt: Optional[datetime]) -> datetime:
@@ -21,5 +31,7 @@ def remove_timezone(dt: Optional[datetime]) -> datetime:
 
 
 __all__ = [
+    get_next_full_hour.__name__,
+    get_now.__name__,
     remove_timezone.__name__,
 ]

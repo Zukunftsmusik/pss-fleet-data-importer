@@ -2,15 +2,14 @@ import asyncio
 import logging
 import queue
 import threading
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Optional
 
 from pss_fleet_data import PssFleetDataClient
 from pss_fleet_data.core.exceptions import ConflictError
 
-from ..database import crud
-from ..database.db import AsyncAutoRollbackSession, Database
+from ..database import AsyncAutoRollbackSession, Database, crud
 from ..models import CollectionFileDB
 from . import CONFIG, utils
 from .config import Config
@@ -147,8 +146,22 @@ class Importer:
         )
         return task
 
-    async def run_bulk_import(self, modified_after: Optional[datetime] = None, modified_before: Optional[datetime] = None):
+    async def run_bulk_import(self, modified_after: Optional[datetime] = None, modified_before: Optional[datetime] = None) -> bool:
+        """Runs a bulk import of files from Google Drive.
+
+        Args:
+            modified_after (datetime, optional): Specifies the time and date after which files have to be modified (created) to be considered for import. Defaults to None.
+            modified_before (datetime, optional): Specifies the time and date before which files have to be modified (created) to be considered for import. Defaults to None.
+
+        Returns:
+            bool: `True`, if files have been imported. `False` if not.
+        """
+        self.logger.info("Retrieving file list from Google Drive.")
         gdrive_files = self.get_gdrive_file_list(modified_after, modified_before)
+
+        if not gdrive_files:
+            self.logger.info("No new files found to be imported. Exiting.")
+            return False
 
         self.logger.debug("Filling download queue.")
         for gdrive_file in gdrive_files:
@@ -161,15 +174,22 @@ class Importer:
         await bulk_imports_task
 
         self.logger.info("Finished bulk import.")
+        return True
 
     async def run_import_loop(self):
-        # Get latest file in DB
         while True:
-            return
-            # Wait until full hour (or 1 minute after that)
-            # List files on gdrive modified after lastest file in DB
-            # Download those files and import them (without queue)
-            # Repeat
+            async with AsyncAutoRollbackSession(self.__database.async_engine) as session:
+                last_imported_file = await crud.get_latest_imported_collection_file(session)
+
+            modified_after = last_imported_file.timestamp if last_imported_file else None
+            did_import = await self.run_bulk_import(modified_after=modified_after)
+
+            if did_import:
+                continue
+
+            now = utils.get_now()
+            wait_for_seconds = (utils.get_next_full_hour(now) + timedelta(minutes=1) - now).total_seconds()
+            asyncio.sleep(wait_for_seconds)
 
     async def worker_download(
         self,
