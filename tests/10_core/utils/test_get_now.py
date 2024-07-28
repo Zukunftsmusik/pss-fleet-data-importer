@@ -1,0 +1,13 @@
+import asyncio
+
+from src.importer.core.utils import get_now
+
+
+async def test_get_now():
+    now = get_now()
+    assert now.tzinfo is None
+
+    asyncio.sleep(0.1)
+
+    later = get_now()
+    assert now != later
