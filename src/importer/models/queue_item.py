@@ -1,0 +1,69 @@
+from datetime import datetime
+from pathlib import Path
+from threading import Lock
+from typing import Optional
+
+from pydrive2.files import GoogleDriveFile
+
+from ..database import AsyncAutoRollbackSession, Database, crud
+from . import CollectionFileDB
+
+
+class CollectionFileQueueItem:
+    def __init__(self, gdrive_file: GoogleDriveFile, collection_file: CollectionFileDB, target_directory: Path, database: Database):
+        self.__gdrive_file: GoogleDriveFile = gdrive_file
+        self.__collection_file: CollectionFileDB = collection_file
+        self.__collection_file_lock: Lock = Lock()
+        self.__database: Database = database
+        self.__download_file_path: Path = None
+        self.__download_file_path_lock = Lock()
+        self.__target_directory: str = target_directory
+
+    @property
+    def collection_file(self) -> CollectionFileDB:
+        with self.__collection_file_lock:
+            return self.__collection_file
+
+    @collection_file.setter
+    def set_collection_file(self, value: CollectionFileDB):
+        with self.__collection_file_lock:
+            self.__collection_file = value
+
+    @property
+    def download_file_path(self) -> Path:
+        with self.__download_file_path_lock:
+            return self.__download_file_path
+
+    @download_file_path.setter
+    def set_download_file_path(self, value: Path):
+        with self.__download_file_path_lock:
+            self.__download_file_path = value
+
+    @property
+    def gdrive_file(self) -> GoogleDriveFile:
+        return self.__gdrive_file
+
+    @property
+    def gdrive_file_name(self) -> str:
+        return self.__gdrive_file.get("name") or self.__gdrive_file.get("title")  # "name" is gdrive API V3, "title" is V2
+
+    @property
+    def gdrive_file_id(self) -> str:
+        return self.__gdrive_file["id"]
+
+    @property
+    def target_directory(self) -> Path:
+        return self.__target_directory
+
+    async def update_collection_file(self, *, downloaded_at: Optional[datetime] = None, imported_at: Optional[datetime] = None) -> CollectionFileDB:
+        with self.__collection_file_lock:
+            if downloaded_at:
+                self.__collection_file.downloaded_at = downloaded_at
+
+            if imported_at:
+                self.__collection_file.imported_at = imported_at
+
+            async with AsyncAutoRollbackSession(self.__database.async_engine) as session:
+                self.__collection_file = await crud.save_collection_file(session, self.__collection_file)
+
+            return self.__collection_file
