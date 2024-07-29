@@ -37,7 +37,7 @@ def get_gdrive_file_name(gdrive_file: GoogleDriveFile) -> str:
     Returns:
         str: The file name.
     """
-    file_name = gdrive_file.get("title") or gdrive_file.get("name")
+    file_name = gdrive_file.get("title") or gdrive_file.get("name")  # "name" is gdrive API V3, "title" is V2
     return file_name
 
 

@@ -5,6 +5,7 @@ from typing import Optional
 
 from pydrive2.files import GoogleDriveFile
 
+from ..core import utils
 from ..database import AsyncAutoRollbackSession, Database, crud
 from . import CollectionFileDB
 
@@ -25,7 +26,7 @@ class CollectionFileQueueItem:
             return self.__collection_file
 
     @collection_file.setter
-    def set_collection_file(self, value: CollectionFileDB):
+    def collection_file(self, value: CollectionFileDB):
         with self.__collection_file_lock:
             self.__collection_file = value
 
@@ -35,7 +36,7 @@ class CollectionFileQueueItem:
             return self.__download_file_path
 
     @download_file_path.setter
-    def set_download_file_path(self, value: Path):
+    def download_file_path(self, value: Path):
         with self.__download_file_path_lock:
             self.__download_file_path = value
 
@@ -44,12 +45,12 @@ class CollectionFileQueueItem:
         return self.__gdrive_file
 
     @property
-    def gdrive_file_name(self) -> str:
-        return self.__gdrive_file.get("name") or self.__gdrive_file.get("title")  # "name" is gdrive API V3, "title" is V2
-
-    @property
     def gdrive_file_id(self) -> str:
         return self.__gdrive_file["id"]
+
+    @property
+    def gdrive_file_name(self) -> str:
+        return utils.get_gdrive_file_name(self.__gdrive_file)
 
     @property
     def target_directory(self) -> Path:
@@ -63,7 +64,13 @@ class CollectionFileQueueItem:
             if imported_at:
                 self.__collection_file.imported_at = imported_at
 
-            async with AsyncAutoRollbackSession(self.__database.async_engine) as session:
+            await self.__database.async_engine.dispose(close=False)
+            async with AsyncAutoRollbackSession(self.__database) as session:
                 self.__collection_file = await crud.save_collection_file(session, self.__collection_file)
 
             return self.__collection_file
+
+
+__all__ = [
+    CollectionFileQueueItem.__name__,
+]

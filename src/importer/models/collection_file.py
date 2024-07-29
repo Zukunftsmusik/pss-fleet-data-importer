@@ -45,3 +45,8 @@ class CollectionFileImport(CollectionFileBase):
     def set_imported(self, imported: bool) -> bool:
         with self.__imported_lock:
             self.__imported = imported
+
+
+__all__ = [
+    CollectionFileImport.__name__,
+]

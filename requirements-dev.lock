@@ -51,7 +51,7 @@ frozenlist==1.4.1
     # via aiosignal
 google-api-core==2.19.1
     # via google-api-python-client
-google-api-python-client==2.137.0
+google-api-python-client==2.138.0
     # via pydrive2
 google-auth==2.32.0
     # via google-api-core
@@ -114,7 +114,7 @@ protobuf==5.27.2
     # via google-api-core
     # via googleapis-common-protos
     # via proto-plus
-pss-fleet-data-client==0.2.0
+pss-fleet-data-client==0.3.1
 pssapi==0.5.1
     # via pss-fleet-data-client
 psycopg2-binary==2.9.9
@@ -144,7 +144,7 @@ pyopenssl==24.2.1
     # via pydrive2
 pyparsing==3.1.2
     # via httplib2
-pytest==8.3.1
+pytest==8.3.2
     # via pytest-asyncio
     # via pytest-env
     # via pytest-httpx

@@ -1,3 +1,4 @@
+import asyncio
 import io
 import logging
 import logging.config
@@ -8,49 +9,32 @@ import alembic.command
 import sqlalchemy_utils
 from alembic.config import Config as AlembicConfig
 from sqlalchemy.exc import DBAPIError
-from sqlalchemy.ext.asyncio import AsyncConnection, AsyncEngine, create_async_engine
+from sqlalchemy.ext.asyncio import AsyncConnection, AsyncEngine, AsyncTransaction, async_scoped_session, async_sessionmaker, create_async_engine
+from sqlalchemy.orm import sessionmaker
+from sqlalchemy.pool import NullPool
+from sqlalchemy.sql import text
+from sqlmodel import SQLModel, create_engine
 from sqlmodel.ext.asyncio.session import AsyncSession
 
 from ..core.config import CONFIG
-
-
-class AsyncAutoRollbackSession(AbstractAsyncContextManager):
-    def __init__(self, async_engine: AsyncEngine):
-        self.__async_engine = async_engine
-        self.__connection: AsyncConnection = None
-        self.session: AsyncSession = None
-        self.__logger: logging.Logger = CONFIG.logger.getChild(AsyncAutoRollbackSession.__name__)
-
-    async def __aenter__(self):
-        self.__connection = await self.__async_engine.connect()
-        async with AsyncSession(bind=self.__connection) as async_session:
-            self.session = async_session
-            return self.session
-
-    async def __aexit__(self, exc_type, exception, traceback):
-        if exception and isinstance(exception, DBAPIError):
-            self.__logger.error("An error occured during a database transaction. Rolling back session.", exc_info=exception, stack_info=True)
-            await self.session.rollback()
-        await self.session.close()
-        await self.__connection.close()
+from .models import *  # noqa: F403
 
 
 class Database:
-    async_connection_string: str = None
-    echo: bool = False
-    sync_connection_string: str = None
-
     def __init__(self, async_connection_string: str, sync_connection_string: str, echo: bool = False):
         self.async_connection_string = async_connection_string
         self.sync_connection_string = sync_connection_string
         self.echo = echo or False
 
         self.logger.info("Setting up async database engine for: %s", async_connection_string.split("@")[-1])
-        self.__async_engine: AsyncEngine = create_async_engine(async_connection_string, echo=self.echo, future=True)
-
-    @property
-    def async_engine(self) -> AsyncEngine:
-        return self.__async_engine
+        self.async_engine: AsyncEngine = create_async_engine(
+            async_connection_string,
+            echo=self.echo,
+            future=True,
+            poolclass=NullPool,
+        )
+        async_session_factory = async_sessionmaker(bind=self.async_engine, class_=AsyncSession)
+        self.async_scoped_session = async_scoped_session(async_session_factory, scopefunc=asyncio.current_task)
 
     @property
     def logger(self) -> logging.Logger:
@@ -70,7 +54,7 @@ class Database:
         Yields:
             AsyncSession: The created `AsyncSession` object.
         """
-        connection: AsyncConnection = await self.__async_engine.connect()
+        connection: AsyncConnection = await self.async_engine.connect()
         try:
             async with AsyncSession(bind=connection) as async_session:
                 try:
@@ -96,7 +80,7 @@ class Database:
         sync_connection_string: Optional[str] = None,
         async_connection_string: Optional[str] = None,
         echo: Optional[bool] = None,
-        drop_tables: Optional[bool] = False,
+        reinitialize: Optional[bool] = False,
     ):
         """Initializes the database. Optionally drops all tables before creating them. Optionally dummy data will be read from disk and inserted.
 
@@ -111,15 +95,15 @@ class Database:
         echo = echo or self.echo
         db_name = sync_connection_string.split("/")[-1]
 
-        if drop_tables and sqlalchemy_utils.database_exists(sync_connection_string):
-            self.logger.info("Dropping database `%s` as requested.", db_name)
-            sqlalchemy_utils.drop_database(sync_connection_string)
-            self.logger.info("Database `%s` dropped.", db_name)
-
         if not sqlalchemy_utils.database_exists(sync_connection_string):
             self.logger.info("Creating database `%s`.", db_name)
             sqlalchemy_utils.create_database(sync_connection_string)
             self.logger.info("Database `%s` created.", db_name)
+
+        if reinitialize:
+            self.logger.info("Dropping tables of database `%s` as requested.", db_name)
+            self.__drop_tables(sync_connection_string)
+            self.logger.info("Tables of database `%s` dropped.", db_name)
 
         if not self.alembic_current_is_head(sync_connection_string=sync_connection_string):
             self.logger.info("Applying migrations to database `%s`.", db_name)
@@ -141,8 +125,48 @@ class Database:
 
         return "(head)" in current
 
+    def __drop_tables(self, sync_connection_string: Optional[str] = None):
+        sync_connection_string = sync_connection_string or self.sync_connection_string
+
+        engine = create_engine(sync_connection_string, poolclass=NullPool)
+        SQLModel.metadata.drop_all(engine)  # Drop all tables in the current schema
+
+        with engine.begin() as connection:
+            connection.execute(text("DROP TABLE IF EXISTS alembic_version;"))  # Drop alembic table, too
+
+        engine.dispose()
+
 
 DATABASE = Database(CONFIG.db_async_connection_str, CONFIG.db_sync_connection_str, CONFIG.db_engine_echo)
+
+
+class AsyncAutoRollbackSession(AbstractAsyncContextManager):
+    # async_session_factory = None
+
+    def __init__(self, database: Database):
+        self.__database = database
+        # self.__async_engine = async_engine
+        self.__connection: AsyncConnection = None
+        self.__session: AsyncSession = None
+        self.__logger: logging.Logger = CONFIG.logger.getChild(AsyncAutoRollbackSession.__name__)
+        # if not self.async_session_factory:
+        #     self.async_session_factory = sessionmaker(self.__async_engine, class_=AsyncSession)
+        # self.__async_scoped_session = async_scoped_session(DATABASE.async_session_factory, scopefunc=current_task)
+
+    async def __aenter__(self):
+        async with self.__database.async_scoped_session() as self.__session:
+            # self.__connection = await self.__async_engine.connect()
+            # async with self.__async_engine.connect() as self.__connection:
+            #     async with AsyncSession(bind=self.__connection) as self.session:
+            async with self.__session.begin():
+                return self.__session
+
+    async def __aexit__(self, exc_type, exception, traceback):
+        if exception and isinstance(exception, DBAPIError):
+            self.__logger.error("An error occured during a database transaction. Rolling back session.", exc_info=exception, stack_info=True)
+            await self.__session.rollback()
+        await self.__session.close()
+        # await self.__connection.close()
 
 
 __all__ = [
