@@ -18,14 +18,22 @@ def extract_timestamp_from_gdrive_file_name(file_name: str) -> datetime:
     Returns:
         datetime: The extracted timestamp as a timezone-naive `datetime`.
     """
-    format_string = "pss-top-100_%Y%m%d-%H%M%S.json"
-    expected_file_name_length = len(format_string) + 2
+    format_strings = [
+        "pss-top-100_%Y%m%d-%H%M%S.json",
+        "pss-top-100-%Y%m%d-%H%M%S.json",
+    ]
+    expected_file_name_lengths = [len(format_string) + 2 for format_string in format_strings]
 
-    if len(file_name) != expected_file_name_length:
-        raise ValueError(f"The provided file name is not of expected length: {expected_file_name_length}")
+    if len(file_name) not in expected_file_name_lengths:
+        raise ValueError(f"The provided file name is not of any expected length: {expected_file_name_lengths}")
 
-    timestamp = datetime.strptime(file_name, format_string)
-    return timestamp
+    for format_string in format_strings:
+        try:
+            timestamp = datetime.strptime(file_name, format_string)
+            return timestamp
+        except ValueError:
+            pass
+    raise ValueError(f"The provided file name did not match any of the expected formats: {format_strings}")
 
 
 def get_gdrive_file_name(gdrive_file: GoogleDriveFile) -> str:

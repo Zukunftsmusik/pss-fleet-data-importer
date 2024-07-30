@@ -11,7 +11,6 @@ def main():
 
 
 async def do_import():
-
     try:
         importer = Importer(
             CONFIG,
@@ -23,8 +22,9 @@ async def do_import():
             temp_download_folder=CONFIG.temp_download_folder,
         )
 
-        # await importer.run_import_loop(modified_after=datetime(2019, 10, 31), modified_before=datetime(2019, 11, 1))
-        await importer.run_import_loop(modified_before=datetime(2019, 10, 19))
+        # await importer.run_import_loop(modified_before=datetime(2020, 8, 1))
+        # await importer.run_import_loop(modified_before=datetime(2022, 1, 1))
+        await importer.run_import_loop()
     except KeyboardInterrupt:
         CONFIG.logger.warn("\nAborted by user, exiting.")
         sys.exit(1)

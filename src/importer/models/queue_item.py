@@ -17,8 +17,10 @@ class CollectionFileQueueItem:
         self.__collection_file_lock: Lock = Lock()
         self.__database: Database = database
         self.__download_file_path: Path = None
-        self.__download_file_path_lock = Lock()
+        self.__download_file_path_lock: Lock = Lock()
         self.__target_directory: str = target_directory
+        self.__error_while_downloading: bool = False
+        self.__error_while_downloading_lock: Lock = Lock()
 
     @property
     def collection_file(self) -> CollectionFileDB:
@@ -39,6 +41,16 @@ class CollectionFileQueueItem:
     def download_file_path(self, value: Path):
         with self.__download_file_path_lock:
             self.__download_file_path = value
+
+    @property
+    def error_while_downloading(self) -> bool:
+        with self.__error_while_downloading_lock:
+            return self.__error_while_downloading
+
+    @error_while_downloading.setter
+    def error_while_downloading(self, value: bool) -> bool:
+        with self.__error_while_downloading_lock:
+            self.__error_while_downloading = value
 
     @property
     def gdrive_file(self) -> GoogleDriveFile:
@@ -64,7 +76,6 @@ class CollectionFileQueueItem:
             if imported_at:
                 self.__collection_file.imported_at = imported_at
 
-            await self.__database.async_engine.dispose(close=False)
             async with AsyncAutoRollbackSession(self.__database) as session:
                 self.__collection_file = await crud.save_collection_file(session, self.__collection_file)
 

@@ -9,6 +9,8 @@ test_cases_valid = [
     # file_name: str, expected_result: datetime
     pytest.param("pss-top-100_20160106-235900.json", datetime(2016, 1, 6, 23, 59), id="valid_1"),
     pytest.param("pss-top-100_20241231-000004.json", datetime(2024, 12, 31, 0, 0, 4), id="valid_2"),
+    pytest.param("pss-top-100-20160106-235900.json", datetime(2016, 1, 6, 23, 59), id="hyphen_instead_of_underscore_1"),
+    pytest.param("pss-top-100-20241231-000004.json", datetime(2024, 12, 31, 0, 0, 4), id="hyphen_instead_of_underscore_2"),
 ]
 """file_name: str, expected_result: datetime"""
 

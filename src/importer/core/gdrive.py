@@ -11,7 +11,7 @@ import pydrive2.files
 import yaml
 from pydrive2.files import GoogleDriveFile, GoogleDriveFileList
 
-from . import CONFIG
+from . import CONFIG, utils
 
 
 class GoogleDriveClient:
@@ -41,7 +41,7 @@ class GoogleDriveClient:
         self.__service_account_file_path: str = service_account_file_path
         self.__settings_file_path: str = settings_file_path
 
-        self.__criterion_in_folder: str = f"'{self.__folder_id}' in parents"
+        self.__base_criteria: str = f"'{self.__folder_id}' in parents and title contains 'pss-top-100' and not title contains 'of'"
 
         self.__gauth: pydrive2.auth.GoogleAuth = None
         self.__drive: pydrive2.drive.GoogleDrive = None
@@ -53,23 +53,23 @@ class GoogleDriveClient:
         return self.__logger
 
     def download_file(self, file: pydrive2.files.GoogleDriveFile, target_dir: Path) -> Path:
-        file_name = file["title"]
+        file_name = utils.get_gdrive_file_name(file)
         file_path = target_dir.joinpath(file_name)
 
         try:
-            self.logger.debug("Downloading file '%s' from Google Drive to: %s", file_name, file_path)
             file.GetContentFile(file_path, mimetype="application/json")
-            return file_path
         except pydrive2.files.ApiRequestError as exc:
-            self.logger.error("An error occured while downloading the file '%s' from Drive to: %s", file_name, file_path, exc_info=exc)
-            return None
+            file_path.unlink(missing_ok=True)
+            raise exc
+
+        return file_path
 
     def list_all_files(self) -> Generator[pydrive2.files.GoogleDriveFile, None, None]:
         self.__ensure_initialized()
 
         params = {
             "orderBy": "createdDate",
-            "q": self.__criterion_in_folder,
+            "q": self.__base_criteria,
         }
         file_list = self.__drive.ListFile(param=params).GetList()
 
@@ -81,7 +81,7 @@ class GoogleDriveClient:
     ) -> Generator[pydrive2.files.GoogleDriveFile, None, None]:
         self.__ensure_initialized()
 
-        criteria = [self.__criterion_in_folder]
+        criteria = [self.__base_criteria]
 
         if modified_after:
             criteria.append(f"modifiedDate > '{modified_after.isoformat()}'")
@@ -101,7 +101,7 @@ class GoogleDriveClient:
 
     def __ensure_initialized(self) -> None:
         try:
-            self.__drive.ListFile({"q": f"{self.__criterion_in_folder} and title contains 'highaöegjoyödfmj giod'"}).GetList()
+            self.__drive.ListFile({"q": f"{self.__base_criteria} and title contains 'highaöegjoyödfmj giod'"}).GetList()
         except pydrive2.auth.InvalidConfigError:
             self.__initialize()
 
