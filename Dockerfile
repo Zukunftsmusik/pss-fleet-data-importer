@@ -6,9 +6,13 @@ WORKDIR /app
 COPY requirements.lock ./
 RUN PYTHONDONTWRITEBYTECODE=1 pip install --no-cache-dir -r requirements.lock
 
-COPY alembic.ini ./alembic.ini
-COPY src ./src
+COPY alembic.ini ./
 
-RUN alembic upgrade head
+# Create empty secrets and settings files, if they don't exist, so the subsequent COPY doesn't fail.
+RUN touch ./client_secrets.json
+RUN touch ./settings.yaml
+COPY client_settings.json settings.yaml ./
 
-ENTRYPOINT ["fastapi", "run", "src/api/main.py", "--port", "80"]
+COPY src ./
+
+ENTRYPOINT ["python", "main.py"]
