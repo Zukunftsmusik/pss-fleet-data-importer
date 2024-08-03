@@ -107,7 +107,7 @@ class GoogleDriveClient:
 
     def __initialize(self) -> None:
         service_account_file = Path(self.__service_account_file_path)
-        if service_account_file.exists():
+        if service_account_file.exists() and not utils.is_empty_file(service_account_file):
             self.logger.info(f"Using existing Service Account Credentials file: {service_account_file.absolute()}")
         else:
             GoogleDriveClient.create_service_account_credential_json(
@@ -121,7 +121,7 @@ class GoogleDriveClient:
             self.logger.info(f"Created Service Account Credentials file: {service_account_file.absolute()}")
 
         settings_file = Path(self.__settings_file_path)
-        if settings_file.exists():
+        if settings_file.exists() and not utils.is_empty_file(settings_file):
             self.logger.info(f"Using existing Settings file: {settings_file.absolute()}")
         else:
             GoogleDriveClient.create_service_account_settings_yaml(
