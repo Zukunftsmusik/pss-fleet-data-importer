@@ -6,13 +6,13 @@ WORKDIR /app
 COPY requirements.lock ./
 RUN PYTHONDONTWRITEBYTECODE=1 pip install --no-cache-dir -r requirements.lock
 
-COPY alembic.ini ./
+COPY alembic.ini main.py ./
 
 # Create empty secrets and settings files, if they don't exist, so the subsequent COPY doesn't fail.
 RUN touch ./client_secrets.json
 RUN touch ./settings.yaml
 COPY client_secrets.json settings.yaml ./
 
-COPY src ./
+COPY src ./src
 
 ENTRYPOINT ["python", "main.py"]
