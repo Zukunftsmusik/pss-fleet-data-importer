@@ -1,6 +1,7 @@
 import asyncio
 from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime, timedelta, timezone
+from pathlib import Path
 from typing import Any, Awaitable, Callable, Iterable, Optional, Union
 
 from pydrive2.files import GoogleDriveFile
@@ -70,6 +71,11 @@ def get_now() -> datetime:
         datetime: The current time in UTC, but without timezone information.
     """
     return remove_timezone(datetime.now(tz=timezone.utc))
+
+
+def is_empty_file(file_path: Union[Path, str]) -> bool:
+    file_path = Path(file_path)
+    return file_path.stat().st_size < 1
 
 
 def remove_timezone(dt: Optional[datetime]) -> datetime:
