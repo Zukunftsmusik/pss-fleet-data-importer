@@ -37,8 +37,12 @@ test:
 # run
 .PHONY: docker
 docker:
-	-docker stop container-pss-fleet-data-api
-	docker rm -f container-pss-fleet-data-api
-	docker image rm -f image-pss-fleet-data-api:latest
-	docker build -t image-pss-fleet-data-api .
-	docker run -d --name container-pss-fleet-data-api -p 8000:80 --env-file ./.docker-env image-pss-fleet-data-api:latest
+	-docker stop container-pss-fleet-data-importer
+	docker rm -f container-pss-fleet-data-importer
+	docker image rm -f image-pss-fleet-data-importer:latest
+	docker build -t image-pss-fleet-data-importer .
+	docker run -d --name container-pss-fleet-data-importer --env-file ./.docker-env image-pss-fleet-data-importer:latest
+
+.PHONY: run
+run:
+	python main.py
