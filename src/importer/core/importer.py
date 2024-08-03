@@ -3,19 +3,18 @@ import json
 import logging
 import queue
 import threading
-from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime, timedelta, timezone
 from multiprocessing.pool import ThreadPool
 from pathlib import Path
 from threading import Lock
-from typing import Any, Callable, Iterable, Optional, Union
+from typing import Optional
 
 import pydrive2.files
-from pss_fleet_data import Collection, PssFleetDataClient
+from pss_fleet_data import PssFleetDataClient
 from pss_fleet_data.core.exceptions import NonUniqueTimestampError
 
 from ..database import AsyncAutoRollbackSession, Database, crud
-from ..models import CollectionFileDB, CollectionFileQueueItem
+from ..models import CollectionFileQueueItem
 from ..models.converters import FromCollectionFileDB, FromGdriveFile
 from . import CONFIG, utils
 from .config import Config
@@ -255,13 +254,7 @@ class Importer:
                 await asyncio.sleep(1)
                 continue
 
-            await wait_until_file_downloaded(logger, file_no, queue_item)
-            if queue_item.error_while_downloading:
-                logger.info("Error while downloading, skipping file no %i: %s", file_no, queue_item.gdrive_file_name)
-                continue
-
-            if await check_if_file_empty(logger, file_no, queue_item):
-                logger.info("Skipping empty file no %i: %s", file_no, queue_item.download_file_path)
+            if await self.skip_file_import_on_error(logger, file_no, queue_item):
                 continue
 
             logger.debug("Importing file %i: %s", file_no, queue_item.download_file_path)
@@ -288,6 +281,18 @@ class Importer:
 
         self.bulk_import_running = False
         parent_logger.info("Import worker finished.")
+
+    async def skip_file_import_on_error(self, logger: logging.Logger, file_no: int, queue_item: CollectionFileQueueItem) -> bool:
+        await wait_until_file_downloaded(logger, file_no, queue_item)
+        if queue_item.error_while_downloading:
+            logger.info("Error while downloading, skipping file no %i: %s", file_no, queue_item.gdrive_file_name)
+            return True
+
+        if await check_if_file_empty(logger, file_no, queue_item):
+            logger.info("Skipping empty file no %i: %s", file_no, queue_item.download_file_path)
+            return True
+
+        return False
 
     async def download_gdrive_file(self, file_no: int, queue_item: CollectionFileQueueItem) -> CollectionFileQueueItem:
         logger = self.logger.getChild("downloadWorker")

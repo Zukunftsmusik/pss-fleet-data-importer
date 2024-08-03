@@ -1,7 +1,7 @@
 import asyncio
 from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime, timedelta, timezone
-from typing import Any, Awaitable, Callable, Coroutine, Iterable, Optional, Union
+from typing import Any, Awaitable, Callable, Iterable, Optional, Union
 
 from pydrive2.files import GoogleDriveFile
 

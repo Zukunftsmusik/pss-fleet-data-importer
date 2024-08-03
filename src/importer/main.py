@@ -1,9 +1,8 @@
 import asyncio
 import sys
-from datetime import datetime
 
 from .core import CONFIG, Importer
-from .database import DATABASE, AsyncAutoRollbackSession, crud, db
+from .database import DATABASE
 
 
 def main():

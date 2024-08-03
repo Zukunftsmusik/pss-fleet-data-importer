@@ -9,15 +9,14 @@ import alembic.command
 import sqlalchemy_utils
 from alembic.config import Config as AlembicConfig
 from sqlalchemy.exc import DBAPIError
-from sqlalchemy.ext.asyncio import AsyncConnection, AsyncEngine, AsyncTransaction, async_scoped_session, async_sessionmaker, create_async_engine
-from sqlalchemy.orm import sessionmaker
+from sqlalchemy.ext.asyncio import AsyncConnection, AsyncEngine, async_scoped_session, async_sessionmaker, create_async_engine
 from sqlalchemy.pool import NullPool
 from sqlalchemy.sql import text
 from sqlmodel import SQLModel, create_engine
 from sqlmodel.ext.asyncio.session import AsyncSession
 
 from ..core.config import CONFIG
-from .models import *  # noqa: F403
+from .models import *  # noqa: F403, F401
 
 
 class Database:
@@ -145,8 +144,7 @@ class AsyncAutoRollbackSession(AbstractAsyncContextManager):
 
     def __init__(self, database: Database):
         self.__database = database
-        # self.__async_engine = async_engine
-        self.__connection: AsyncConnection = None
+        # self.__connection: AsyncConnection = None
         self.__session: AsyncSession = None
         self.__logger: logging.Logger = CONFIG.logger.getChild(AsyncAutoRollbackSession.__name__)
         # if not self.async_session_factory:
@@ -161,8 +159,8 @@ class AsyncAutoRollbackSession(AbstractAsyncContextManager):
             async with self.__session.begin():
                 return self.__session
 
-    async def __aexit__(self, exc_type, exception, traceback):
-        if exception and isinstance(exception, DBAPIError):
+    async def __aexit__(self, exc_type, exception, _):
+        if exception and exc_type is DBAPIError:
             self.__logger.error("An error occured during a database transaction. Rolling back session.", exc_info=exception, stack_info=True)
             await self.__session.rollback()
         await self.__session.close()

@@ -4,8 +4,7 @@ from typing import Iterable
 from pydrive2.files import GoogleDriveFile
 
 from ..core import utils
-from ..database import crud
-from ..database.db import AsyncAutoRollbackSession, Database
+from ..database.db import Database
 from ..database.models import CollectionFileDB
 from ..models.queue_item import CollectionFileQueueItem
 
