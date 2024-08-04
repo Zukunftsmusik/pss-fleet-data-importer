@@ -1,5 +1,6 @@
 .env
 .docker-env
+cov.xml
 
 # Google Drive Auth
 client_secrets.json
