@@ -2,7 +2,7 @@ import asyncio
 import sys
 
 from .core import Importer, get_config
-from .database import DATABASE
+from .database import get_db
 
 
 def main():
@@ -19,7 +19,7 @@ async def do_import():
     try:
         importer = Importer(
             get_config(),
-            DATABASE,
+            get_db(),
             gdrive_folder_id=get_config().gdrive_folder_id,
             api_server_url=get_config().api_default_server_url,
             api_key=get_config().api_key,

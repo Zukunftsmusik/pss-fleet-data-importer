@@ -1,11 +1,11 @@
 from . import crud
-from .db import DATABASE, AsyncAutoRollbackSession, Database
+from .db import AsyncAutoRollbackSession, Database, get_db
 from .models import CollectionFileBase, CollectionFileDB
 
 
 __all__ = [
-    # objects
-    "DATABASE",
+    # functions
+    get_db.__name__,
     # modules
     crud.__name__,
     # classes

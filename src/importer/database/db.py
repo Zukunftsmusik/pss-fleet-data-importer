@@ -136,7 +136,7 @@ class Database:
         engine.dispose()
 
 
-DATABASE = Database(get_config().db_async_connection_str, get_config().db_sync_connection_str, get_config().db_engine_echo)
+__DATABASE = Database(get_config().db_async_connection_str, get_config().db_sync_connection_str, get_config().db_engine_echo)
 
 
 class AsyncAutoRollbackSession(AbstractAsyncContextManager):
@@ -167,7 +167,12 @@ class AsyncAutoRollbackSession(AbstractAsyncContextManager):
         # await self.__connection.close()
 
 
+def get_db():
+    return __DATABASE
+
+
 __all__ = [
     AsyncAutoRollbackSession.__name__,
-    "DATABASE",
+    Database.__name__,
+    get_db.__name__,
 ]
