@@ -10,10 +10,15 @@ from typing import Optional
 from . import logger
 
 
+def get_config() -> "Config":
+    return get_config()
+
+
 @dataclass(frozen=True)
 class Config:
     # Basic settings
     app_name: str = "importer"
+    app_version: str = "0.1.0"
     pss_start_date: datetime = datetime(2016, 1, 6, tzinfo=timezone.utc)
     earliest_data_date: datetime = datetime(2019, 10, 10, tzinfo=timezone.utc)
     temp_download_folder: Path = Path("./downloads")
@@ -59,8 +64,13 @@ class Config:
 
     @property
     def log_level(self) -> int:
+        from_env = os.getenv("LOG_LEVEL")
+        if from_env:
+            return logging.getLevelNamesMapping().get(from_env, "INFO")
+
         if self.debug_mode:
             return logging.DEBUG
+
         return logging.INFO
 
     @property
@@ -76,7 +86,7 @@ class Config:
         logging.Formatter.converter = time.gmtime
 
 
-CONFIG = Config()
+__CONFIG = Config()
 
 
 LOGGING_BASE_CONFIG = {
@@ -127,7 +137,7 @@ LOGGING_BASE_CONFIG = {
     "loggers": {
         "importer": {
             "handlers": ["stderr"],
-            "level": CONFIG.log_level,
+            "level": get_config().log_level,
             "propagate": False,
         },
         "": {  # root logger
@@ -153,4 +163,10 @@ LOGGING_BASE_CONFIG = {
 }
 
 
-CONFIG.configure_logging(LOGGING_BASE_CONFIG)
+__CONFIG.configure_logging(LOGGING_BASE_CONFIG)
+
+
+__all__ = [
+    Config.__name__,
+    get_config.__name__,
+]

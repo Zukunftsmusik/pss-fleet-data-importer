@@ -15,7 +15,7 @@ from sqlalchemy.sql import text
 from sqlmodel import SQLModel, create_engine
 from sqlmodel.ext.asyncio.session import AsyncSession
 
-from ..core.config import CONFIG
+from ..core.config import get_config
 from .models import *  # noqa: F403, F401
 
 
@@ -37,8 +37,8 @@ class Database:
 
     @property
     def logger(self) -> logging.Logger:
-        result = CONFIG.logger.getChild(Database.__qualname__)
-        result.setLevel(CONFIG.log_level)
+        result = get_config().logger.getChild(Database.__qualname__)
+        result.setLevel(get_config().log_level)
         return result
 
     async def get_session(self) -> AsyncGenerator[AsyncSession, None]:
@@ -136,7 +136,7 @@ class Database:
         engine.dispose()
 
 
-DATABASE = Database(CONFIG.db_async_connection_str, CONFIG.db_sync_connection_str, CONFIG.db_engine_echo)
+DATABASE = Database(get_config().db_async_connection_str, get_config().db_sync_connection_str, get_config().db_engine_echo)
 
 
 class AsyncAutoRollbackSession(AbstractAsyncContextManager):
@@ -146,7 +146,7 @@ class AsyncAutoRollbackSession(AbstractAsyncContextManager):
         self.__database = database
         # self.__connection: AsyncConnection = None
         self.__session: AsyncSession = None
-        self.__logger: logging.Logger = CONFIG.logger.getChild(AsyncAutoRollbackSession.__name__)
+        self.__logger: logging.Logger = get_config().logger.getChild(AsyncAutoRollbackSession.__name__)
         # if not self.async_session_factory:
         #     self.async_session_factory = sessionmaker(self.__async_engine, class_=AsyncSession)
         # self.__async_scoped_session = async_scoped_session(DATABASE.async_session_factory, scopefunc=current_task)

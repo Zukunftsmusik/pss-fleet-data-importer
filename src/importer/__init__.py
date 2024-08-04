@@ -7,5 +7,5 @@ __all__ = [
     models.__name__,
 ]
 
-__app_name__ = core.config.CONFIG.app_name
-__version__ = "0.1.0"
+__app_name__ = core.config.get_config().app_name
+__version__ = core.config.get_config().app_version

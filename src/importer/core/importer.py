@@ -16,12 +16,12 @@ from pss_fleet_data.core.exceptions import NonUniqueTimestampError
 from ..database import AsyncAutoRollbackSession, Database, crud
 from ..models import CollectionFileQueueItem
 from ..models.converters import FromCollectionFileDB, FromGdriveFile
-from . import CONFIG, utils
-from .config import Config
+from . import utils
+from .config import Config, get_config
 from .gdrive import GoogleDriveClient, GoogleDriveFile
 
 
-if CONFIG.debug_mode:
+if get_config().debug_mode:
     from time import perf_counter
 
 
@@ -91,7 +91,7 @@ class Importer:
 
     @property
     def temp_download_folder(self) -> Path:
-        return self.__temp_download_folder or CONFIG.temp_download_folder
+        return self.__temp_download_folder or get_config().temp_download_folder
 
     @property
     def bulk_download_running(self) -> bool:
@@ -255,14 +255,17 @@ class Importer:
                 continue
 
             if await self.skip_file_import_on_error(logger, file_no, queue_item):
+                import_queue.task_done()
                 continue
 
             logger.debug("Importing file %i: %s", file_no, queue_item.download_file_path)
 
             try:
                 collection_metadata = await fleet_data_client.upload_collection(str(queue_item.download_file_path), api_key=api_key)
+                imported_at = utils.remove_timezone(datetime.now(tz=timezone.utc))
                 logger.info("Imported file %i (Collection ID: %i): %s", file_no, collection_metadata.collection_id, queue_item.download_file_path)
             except NonUniqueTimestampError:
+                imported_at = utils.remove_timezone(datetime.now(tz=timezone.utc))
                 collection_metadata = await fleet_data_client.get_most_recent_collection_metadata_by_timestamp(queue_item.collection_file.timestamp)
                 logger.info(
                     "Skipped file %i (Collection already exists with ID: %i): %s",
@@ -270,9 +273,13 @@ class Importer:
                     collection_metadata.collection_id,
                     queue_item.download_file_path,
                 )
+            except Exception as exc:
+                logger.error(exc)
+                import_queue.task_done()
+                continue
 
             if collection_metadata:
-                await queue_item.update_collection_file(imported_at=utils.remove_timezone(datetime.now(tz=timezone.utc)))
+                await queue_item.update_collection_file(imported_at=imported_at)
 
                 if not self.__config.keep_downloaded_files:
                     queue_item.download_file_path.unlink(missing_ok=True)
@@ -285,11 +292,11 @@ class Importer:
     async def skip_file_import_on_error(self, logger: logging.Logger, file_no: int, queue_item: CollectionFileQueueItem) -> bool:
         await wait_until_file_downloaded(logger, file_no, queue_item)
         if queue_item.error_while_downloading:
-            logger.info("Error while downloading, skipping file no %i: %s", file_no, queue_item.gdrive_file_name)
+            logger.warn("Error while downloading, skipping file no %i: %s", file_no, queue_item.gdrive_file_name)
             return True
 
         if await check_if_file_empty(logger, file_no, queue_item):
-            logger.info("Skipping empty file no %i: %s", file_no, queue_item.download_file_path)
+            logger.warn("Skipping empty file no %i: %s", file_no, queue_item.download_file_path)
             return True
 
         return False

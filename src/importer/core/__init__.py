@@ -1,11 +1,11 @@
 from . import utils
-from .config import CONFIG
+from .config import get_config
 from .importer import Importer
 
 
 __all__ = [
-    # objects
-    "CONFIG",
+    # functions
+    get_config.__name__,
     # classes
     Importer.__name__,
     # modules
