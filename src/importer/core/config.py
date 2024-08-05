@@ -11,7 +11,7 @@ from . import logger
 
 
 def get_config() -> "Config":
-    return get_config()
+    return __CONFIG
 
 
 @dataclass(frozen=True)
@@ -22,7 +22,7 @@ class Config:
     pss_start_date: datetime = datetime(2016, 1, 6, tzinfo=timezone.utc)
     earliest_data_date: datetime = datetime(2019, 10, 10, tzinfo=timezone.utc)
     temp_download_folder: Path = Path("./downloads")
-    download_thread_pool_size: int = 4
+    download_thread_pool_size: int = 2
 
     # PSS Fleet Data API
     api_default_server_url: str = os.getenv("FLEET_DATA_API_URL", "https://fleetdata.dolores2.xyz")
@@ -156,7 +156,7 @@ LOGGING_BASE_CONFIG = {
         },
         "alembic": {
             "handlers": ["alembic_console"],
-            "level": logging.INFO,
+            "level": max(logging.INFO, get_config().log_level),
             "propagate": False,
         },
     },

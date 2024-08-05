@@ -83,6 +83,12 @@ If you ran across a bug or have a feature request, please check if there's [alre
 
 If you want to fix a bug or add a feature, please check out the [Contribution Guide](CONTRIBUTING.md).
 
+# 🔭 Future plans
+
+- Add docstrings to everything
+- 100 % test coverage
+- Turn the tool into a [Typer](https://typer.tiangolo.com/) app
+
 # 🆘 Support
 If you need help using the Importer or want to contribute, you can join my support Discord at: [discord.gg/kKguSec](https://https://discord.gg/kKguSec)
 

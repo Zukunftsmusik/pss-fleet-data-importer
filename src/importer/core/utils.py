@@ -1,10 +1,14 @@
 import asyncio
+import threading
 from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
-from typing import Any, Awaitable, Callable, Iterable, Optional, Union
+from typing import Any, Awaitable, Callable, Iterable, Mapping, Optional, Union
 
+from cancel_token import CancellationToken
 from pydrive2.files import GoogleDriveFile
+
+from ..models import StatusFlag
 
 
 def extract_timestamp_from_gdrive_file_name(file_name: str) -> datetime:
@@ -96,38 +100,41 @@ def remove_timezone(dt: Optional[datetime]) -> datetime:
     return dt.replace(tzinfo=None)
 
 
-def run_async_thread_pool_executor(
-    fn: Callable[..., Awaitable[None]],
-    arguments: Union[Iterable[Iterable[Any]], Iterable[Any]],
-    max_workers: int,
-) -> ThreadPoolExecutor:
-    """Run an async function with multiple threads in parallel, passing the given arguments.
+def start_pooled_bulk_operation(
+    thread_pool_size: int,
+    worker_func: Callable,
+    worker_items: Iterable[Any],
+    cancel_token: CancellationToken = None,
+    status_flag: StatusFlag = None,
+):
+    if status_flag is not None:
+        status_flag.value = True
 
-    Args:
-        fn (Callable[..., Awaitable[Any, Any, None]]): An async function taking an arbitrary number of positional arguments. This function returns nothing.
-        arguments (Union[Iterable[Iterable[Any]], Iterable[Any]]): An iterable of arguments or list of arguments to be passed to `fn`.
-        max_workers (int): The maximum number of worker threads to be used.
+    with ThreadPoolExecutor(thread_pool_size) as executor:
+        for item in worker_items:
+            if cancel_token and cancel_token.cancelled:
+                return
 
-    Returns:
-        ThreadPoolExecutor: An executor managing the thread pool to be waited on, closed, canceled etc.
-    """
-    executor = ThreadPoolExecutor(max_workers=max_workers)
+            executor.submit(worker_func, item)
 
-    if arguments:
-        if isinstance(arguments[0], Iterable):
-            workers = [fn(*args) for args in arguments]
-        else:
-            workers = [fn(arg) for arg in arguments]
-        executor.map(asyncio.run, workers)
+    if status_flag is not None:
+        status_flag.value = False
 
-    return executor
+
+def create_async_thread(coro: Callable[..., Awaitable[Any]], *args: Any, daemon: bool = True, **kwargs: Mapping[str, Any]) -> threading.Thread:
+    def target():
+        asyncio.run(coro(*args, **kwargs))
+
+    thread = threading.Thread(target=target, daemon=daemon)
+    return thread
 
 
 __all__ = [
+    create_async_thread.__name__,
     extract_timestamp_from_gdrive_file_name.__name__,
     get_gdrive_file_name.__name__,
     get_next_full_hour.__name__,
     get_now.__name__,
     remove_timezone.__name__,
-    run_async_thread_pool_executor.__name__,
+    start_pooled_bulk_operation.__name__,
 ]

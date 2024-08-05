@@ -136,7 +136,11 @@ class Database:
         engine.dispose()
 
 
-__DATABASE = Database(get_config().db_async_connection_str, get_config().db_sync_connection_str, get_config().db_engine_echo)
+__DATABASE = Database(
+    get_config().db_async_connection_str,
+    get_config().db_sync_connection_str,
+    get_config().db_engine_echo,
+)
 
 
 class AsyncAutoRollbackSession(AbstractAsyncContextManager):

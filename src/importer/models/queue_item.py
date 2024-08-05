@@ -3,6 +3,7 @@ from pathlib import Path
 from threading import Lock
 from typing import Optional
 
+from cancel_token import CancellationToken
 from pydrive2.files import GoogleDriveFile
 
 from ..core import utils
@@ -11,14 +12,22 @@ from . import CollectionFileDB
 
 
 class CollectionFileQueueItem:
-    def __init__(self, gdrive_file: GoogleDriveFile, collection_file: CollectionFileDB, target_directory: Path, database: Database):
-        self.__gdrive_file: GoogleDriveFile = gdrive_file
+    def __init__(
+        self,
+        item_no: int,
+        gdrive_file: GoogleDriveFile,
+        collection_file: CollectionFileDB,
+        target_directory: Path,
+        cancel_token: CancellationToken,
+    ):
+        self.cancel_token: CancellationToken = cancel_token
+        self.item_no: int = item_no
+        self.gdrive_file: GoogleDriveFile = gdrive_file
         self.__collection_file: CollectionFileDB = collection_file
         self.__collection_file_lock: Lock = Lock()
-        self.__database: Database = database
         self.__download_file_path: Path = None
         self.__download_file_path_lock: Lock = Lock()
-        self.__target_directory: str = target_directory
+        self.__target_directory_path: Path = Path(target_directory)
         self.__error_while_downloading: bool = False
         self.__error_while_downloading_lock: Lock = Lock()
 
@@ -53,22 +62,28 @@ class CollectionFileQueueItem:
             self.__error_while_downloading = value
 
     @property
-    def gdrive_file(self) -> GoogleDriveFile:
-        return self.__gdrive_file
+    def gdrive_file_size(self) -> str:
+        return self.gdrive_file["fileSize"]
 
     @property
     def gdrive_file_id(self) -> str:
-        return self.__gdrive_file["id"]
+        return self.gdrive_file["id"]
 
     @property
     def gdrive_file_name(self) -> str:
-        return utils.get_gdrive_file_name(self.__gdrive_file)
+        return utils.get_gdrive_file_name(self.gdrive_file)
 
     @property
-    def target_directory(self) -> Path:
-        return self.__target_directory
+    def target_directory_path(self) -> Path:
+        return self.__target_directory_path
 
-    async def update_collection_file(self, *, downloaded_at: Optional[datetime] = None, imported_at: Optional[datetime] = None) -> CollectionFileDB:
+    @property
+    def target_file_path(self) -> Path:
+        return self.target_directory_path.joinpath(self.gdrive_file_name)
+
+    async def update_collection_file(
+        self, database: Database, downloaded_at: Optional[datetime] = None, imported_at: Optional[datetime] = None
+    ) -> CollectionFileDB:
         with self.__collection_file_lock:
             if downloaded_at:
                 self.__collection_file.downloaded_at = downloaded_at
@@ -76,8 +91,9 @@ class CollectionFileQueueItem:
             if imported_at:
                 self.__collection_file.imported_at = imported_at
 
-            async with AsyncAutoRollbackSession(self.__database) as session:
-                self.__collection_file = await crud.save_collection_file(session, self.__collection_file)
+            if not self.cancel_token.cancelled:
+                async with AsyncAutoRollbackSession(database) as session:
+                    self.__collection_file = await crud.save_collection_file(session, self.__collection_file)
 
             return self.__collection_file
 
