@@ -8,6 +8,7 @@ authors = [
 dependencies = [
     "alembic>=1.13.2",
     "asyncpg>=0.29.0",
+    "cancel-token>=0.1.6",
     "pssapi>=0.5.1",
     "pss-fleet-data-client>=0.3.1",
     "psycopg2-binary>=2.9.9",
