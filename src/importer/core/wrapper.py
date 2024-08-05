@@ -8,7 +8,7 @@ def debug_log_running_time(logger: logging.Logger, message: str) -> Callable[...
         start = perf_counter()
         result = func(*args, **kwargs)
         end = perf_counter()
-        logger.info("%s took %.2f seconds", message, end - start)
+        logger.debug("%s took %.2f seconds", message, end - start)
         return result
 
     return wrapper
