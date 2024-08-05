@@ -36,6 +36,8 @@ class Importer:
         download_thread_pool_size: int = 3,
         temp_download_folder: Path = None,
     ):
+        self.__config: Config = config
+
         self.api_server_url: str = api_server_url or self.__config.api_default_server_url
         self.gdrive_folder_id: str = gdrive_folder_id or self.__config.gdrive_folder_id
         self.logger: logging.Logger = self.__config.logger.getChild(Importer.__name__)
@@ -43,7 +45,6 @@ class Importer:
         self.thread_pool_size: int = download_thread_pool_size
         self.temp_download_folder: Path = temp_download_folder or get_config().temp_download_folder
 
-        self.__config: Config = config
         self.__database: Database = database
         self.__api_key: str = api_key or self.__config.api_key
 
@@ -88,14 +89,19 @@ class Importer:
 
     async def run_import_loop(self, modified_after: Optional[datetime] = None, modified_before: Optional[datetime] = None):
         while not self.status.cancel_token.cancelled:
+            while self.status.bulk_database_running:
+                await asyncio.sleep(0.1)
+
+            after = modified_after
             if not modified_after:
                 async with AsyncAutoRollbackSession(self.__database) as session:
                     last_imported_file = await crud.get_latest_imported_collection_file(session)
-                    modified_after = utils.get_next_full_hour(last_imported_file.timestamp) if last_imported_file else None
+                    after = utils.get_next_full_hour(last_imported_file.timestamp) if last_imported_file else None
 
-            did_import = await self.run_bulk_import(modified_after=modified_after, modified_before=modified_before)
+            did_import = await self.run_bulk_import(modified_after=after, modified_before=modified_before)
 
             if did_import:
+                await asyncio.sleep(1)  # Wait a second for database transactions to finish
                 continue
 
             now = utils.get_now()
@@ -192,10 +198,10 @@ class Importer:
             try:
                 queue_item, downloaded_at, imported_at = database_queue.get(block=False)
             except queue.Empty:
-                if not self.status.bulk_download_running.value and not self.status.bulk_import_running.value:
-                    break
                 await asyncio.sleep(1)
                 continue
+
+            self.status.bulk_database_running = True
 
             await queue_item.update_collection_file(database, downloaded_at=downloaded_at, imported_at=imported_at)
             logger.debug(
@@ -205,6 +211,8 @@ class Importer:
             )
 
             database_queue.task_done()
+
+            self.status.bulk_database_running = False
 
         if cancel_token.cancelled:
             parent_logger.info("Database worker cancelled.")
@@ -309,7 +317,8 @@ class Importer:
 
 def check_if_exists(queue_item: CollectionFileQueueItem):
     if queue_item.target_file_path.exists():
-        if queue_item.target_file_path.stat().st_size == queue_item.gdrive_file_size:
+        file_size = queue_item.target_file_path.stat().st_size
+        if file_size == queue_item.gdrive_file_size:
             return True
     return False
 
@@ -424,7 +433,7 @@ async def wait_until_file_downloaded(logger: logging.Logger, file_no: int, queue
         if not waiting:
             logger.debug("Waiting with import until file %i is downloaded: %s", file_no, queue_item.gdrive_file_name)
             waiting = True
-        await asyncio.sleep(0.2)
+        await asyncio.sleep(0.1)
 
 
 async def skip_file_import_on_error(logger: logging.Logger, file_no: int, queue_item: CollectionFileQueueItem) -> bool:
