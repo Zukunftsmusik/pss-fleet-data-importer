@@ -62,8 +62,8 @@ class CollectionFileQueueItem:
             self.__error_while_downloading = value
 
     @property
-    def gdrive_file_size(self) -> str:
-        return self.gdrive_file["fileSize"]
+    def gdrive_file_size(self) -> int:
+        return int(self.gdrive_file["fileSize"])
 
     @property
     def gdrive_file_id(self) -> str:
