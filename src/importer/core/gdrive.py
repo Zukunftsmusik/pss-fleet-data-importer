@@ -77,7 +77,7 @@ class GoogleDriveClient:
             yield file
 
     def list_files_by_modified_date(
-        self, *, modified_after: Optional[datetime] = None, modified_before: Optional[datetime] = None
+        self, modified_after: Optional[datetime] = None, modified_before: Optional[datetime] = None
     ) -> Generator[pydrive2.files.GoogleDriveFile, None, None]:
         self.__ensure_initialized()
 

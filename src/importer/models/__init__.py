@@ -1,6 +1,6 @@
 from ..database.models import CollectionFileBase, CollectionFileDB
 from . import converters
-from .collection_file import CollectionFileChange
+from .collection_file_change import CollectionFileChange
 from .queue_item import CollectionFileQueueItem
 from .status import ImportStatus, StatusFlag
 

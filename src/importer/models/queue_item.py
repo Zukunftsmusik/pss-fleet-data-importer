@@ -6,7 +6,7 @@ from pydrive2.files import GoogleDriveFile
 
 from ..core import utils
 from ..database import AsyncAutoRollbackSession, CollectionFileDB, Database, crud
-from .collection_file import CollectionFileChange
+from .collection_file_change import CollectionFileChange
 
 
 class CollectionFileQueueItem:
