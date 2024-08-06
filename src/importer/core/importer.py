@@ -14,7 +14,7 @@ from pss_fleet_data.core.exceptions import NonUniqueTimestampError
 from pydrive2.files import ApiRequestError
 
 from ..database import AsyncAutoRollbackSession, Database, crud
-from ..models import CollectionFileQueueItem, ImportStatus
+from ..models import CollectionFileChange, CollectionFileQueueItem, ImportStatus
 from ..models.converters import FromCollectionFileDB, FromGdriveFile
 from . import utils, wrapper
 from .config import Config, get_config
@@ -166,19 +166,19 @@ class Importer:
         self.logger.info("Starting database worker...")
         database_thread.start()
 
-        import_thread = utils.create_async_thread(
-            self.worker_import,
-            self.__import_queue,
-            self.__database_queue,
-            self.__api_key,
-            self.__fleet_data_client,
-            self.logger,
-            self.status.cancel_token,
-            self.__config.keep_downloaded_files,
-            daemon=True,
-        )
-        self.logger.info("Starting import worker...")
-        import_thread.start()
+        # import_thread = utils.create_async_thread(
+        #     self.worker_import,
+        #     self.__import_queue,
+        #     self.__database_queue,
+        #     self.__api_key,
+        #     self.__fleet_data_client,
+        #     self.logger,
+        #     self.status.cancel_token,
+        #     self.__config.keep_downloaded_files,
+        #     daemon=True,
+        # )
+        # self.logger.info("Starting import worker...")
+        # import_thread.start()
 
         while self.status.bulk_download_running.value or self.status.bulk_import_running.value:
             await asyncio.sleep(1)
@@ -191,24 +191,19 @@ class Importer:
     async def worker_db(self, database: Database, database_queue: queue.Queue, parent_logger: logging.Logger, cancel_token: CancellationToken):
         logger = parent_logger.parent.getChild("databaseWorker")
         queue_item: CollectionFileQueueItem
-        downloaded_at: Optional[datetime]
-        imported_at: Optional[datetime]
+        change: CollectionFileChange
 
         while not cancel_token.cancelled:
             try:
-                queue_item, downloaded_at, imported_at = database_queue.get(block=False)
+                queue_item, change = database_queue.get(block=False)
             except queue.Empty:
                 await asyncio.sleep(1)
                 continue
 
             self.status.bulk_database_running = True
 
-            await queue_item.update_collection_file(database, downloaded_at=downloaded_at, imported_at=imported_at)
-            logger.debug(
-                "Updated queue item no. %i: %s",
-                queue_item.item_no,
-                f"set downloaded_at={downloaded_at.isoformat()}" if downloaded_at else f"set imported_at={imported_at.isoformat()}",
-            )
+            await queue_item.update_collection_file(database, change)
+            log_queue_item_update(logger, queue_item, change)
 
             database_queue.task_done()
 
@@ -253,7 +248,7 @@ class Importer:
                 return
 
             queue_item.download_file_path = downloaded_file_path
-            self.__database_queue.put((queue_item, utils.remove_timezone(datetime.now(tz=timezone.utc)), None))
+            self.__database_queue.put((queue_item, CollectionFileChange(downloaded_at=utils.get_now())))
 
     async def worker_import(
         self,
@@ -303,7 +298,7 @@ class Importer:
                 continue
 
             if collection_metadata:
-                database_queue.put((queue_item, None, imported_at))
+                database_queue.put((queue_item, CollectionFileChange(imported_at=imported_at)))
 
                 if not keep_downloaded_files:
                     queue_item.download_file_path.unlink(missing_ok=True)
@@ -461,3 +456,7 @@ async def skip_file_import_on_error(logger: logging.Logger, file_no: int, queue_
             return True
 
     return False
+
+
+def log_queue_item_update(logger: logging.Logger, queue_item: CollectionFileQueueItem, change: CollectionFileChange):
+    logger.debug("Updated queue item no. %i: %s", queue_item.item_no, change)

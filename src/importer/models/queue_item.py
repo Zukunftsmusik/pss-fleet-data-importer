@@ -1,14 +1,12 @@
-from datetime import datetime
 from pathlib import Path
 from threading import Lock
-from typing import Optional
 
 from cancel_token import CancellationToken
 from pydrive2.files import GoogleDriveFile
 
 from ..core import utils
-from ..database import AsyncAutoRollbackSession, Database, crud
-from . import CollectionFileDB
+from ..database import AsyncAutoRollbackSession, CollectionFileDB, Database, crud
+from .collection_file import CollectionFileChange
 
 
 class CollectionFileQueueItem:
@@ -81,15 +79,13 @@ class CollectionFileQueueItem:
     def target_file_path(self) -> Path:
         return self.target_directory_path.joinpath(self.gdrive_file_name)
 
-    async def update_collection_file(
-        self, database: Database, downloaded_at: Optional[datetime] = None, imported_at: Optional[datetime] = None
-    ) -> CollectionFileDB:
+    async def update_collection_file(self, database: Database, change: CollectionFileChange) -> CollectionFileDB:
         with self.__collection_file_lock:
-            if downloaded_at:
-                self.__collection_file.downloaded_at = downloaded_at
+            if change.downloaded_at:
+                self.__collection_file.downloaded_at = change.downloaded_at
 
-            if imported_at:
-                self.__collection_file.imported_at = imported_at
+            if change.imported_at:
+                self.__collection_file.imported_at = change.imported_at
 
             if not self.cancel_token.cancelled:
                 async with AsyncAutoRollbackSession(database) as session:

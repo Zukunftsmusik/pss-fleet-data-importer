@@ -1,52 +1,39 @@
-import datetime
-from threading import Lock
+from dataclasses import dataclass
+from datetime import datetime
+from typing import Optional
 
-from . import CollectionFileBase
 
+@dataclass(frozen=True)
+class CollectionFileChange:
+    downloaded_at: Optional[datetime] = None
+    imported_at: Optional[datetime] = None
+    download_errors: Optional[int] = None
 
-class CollectionFileImport(CollectionFileBase):
-    def __init__(self, collection_file: CollectionFileBase):
-        self.__collection_file = collection_file
+    def __str__(self) -> str:
+        changes = []
 
-        self.__downloaded: bool = False
-        self.__downloaded_lock: Lock = Lock()
+        if self.downloaded_at:
+            changes.append(f"downloaded_at={self.downloaded_at.isoformat()}")
 
-        self.__imported: bool = False
-        self.__imported_lock: Lock = Lock()
+        if self.imported_at:
+            changes.append(f"imported_at={self.imported_at.isoformat()}")
 
-    @property
-    def downloaded(self) -> bool:
-        with self.__downloaded_lock:
-            return self.__downloaded
+        if self.download_errors:
+            changes.append(f"download_errors={self.download_errors}")
 
-    @property
-    def file_name(self) -> str:
-        return self.__collection_file.file_name
+        return ", ".join(changes)
 
-    @property
-    def gdrive_file_id(self) -> str:
-        return self.__collection_file.gdrive_file_id
-
-    @property
-    def imported(self) -> bool:
-        with self.__imported_lock:
-            return self.__imported
-
-    @property
-    def timestamp(self) -> datetime:
-        return self.__collection_file.timestamp
-
-    @downloaded.setter
-    def set_downloaded(self, downloaded: bool) -> bool:
-        with self.__downloaded_lock:
-            self.__downloaded = downloaded
-
-    @imported.setter
-    def set_imported(self, imported: bool) -> bool:
-        with self.__imported_lock:
-            self.__imported = imported
+    def __repr__(self) -> str:
+        attributes = ", ".join(
+            [
+                f"downloaded_at={self.downloaded_at.isoformat() if self.downloaded_at else None}",
+                f"imported_at={self.imported_at.isoformat() if self.imported_at else None}",
+                f"download_errors={self.download_errors}",
+            ]
+        )
+        return f"<CollectionFileChange: {attributes}>"
 
 
 __all__ = [
-    CollectionFileImport.__name__,
+    CollectionFileChange.__name__,
 ]
