@@ -238,12 +238,15 @@ class Importer:
         else:
             queue_item.target_file_path.unlink(missing_ok=True)  # File also counts as not existing, if the file size differs from the file on gdrive
 
-            try:
-                downloaded_file_path = self.__gdrive_client.download_file(queue_item.gdrive_file, queue_item.target_directory_path)
-                logger.debug("File no. %i downloaded: %s", queue_item.item_no, queue_item.target_file_path)
-            except pydrive2.files.ApiRequestError as exc:
-                log_gdrive_error(logger, queue_item, self.__config.debug_mode, exc)
-                queue_item.error_while_downloading = True
+            for _ in range(3):
+                try:
+                    downloaded_file_path = self.__gdrive_client.download_file(queue_item.gdrive_file, queue_item.target_directory_path)
+                    logger.debug("File no. %i downloaded: %s", queue_item.item_no, queue_item.target_file_path)
+                    queue_item.error_while_downloading = False
+                    break
+                except pydrive2.files.ApiRequestError as exc:
+                    log_gdrive_error(logger, queue_item, self.__config.debug_mode, exc)
+                    queue_item.error_while_downloading = True
 
         if downloaded_file_path:
             if queue_item.cancel_token.cancelled:
@@ -424,7 +427,7 @@ def log_gdrive_error(logger: logging.Logger, queue_item: CollectionFileQueueItem
     if log_exception:
         logger.error(msg, exc_info=exc)
     else:
-        logger.error(msg)
+        logger.error("%s:  %s", msg, type(exc))
 
 
 async def wait_until_file_downloaded(logger: logging.Logger, file_no: int, queue_item: CollectionFileQueueItem):
