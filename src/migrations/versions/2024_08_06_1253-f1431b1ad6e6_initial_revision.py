@@ -1,8 +1,8 @@
-"""initial_revision
+"""Initial Revision
 
-Revision ID: 34c3743f15ed
+Revision ID: f1431b1ad6e6
 Revises: 
-Create Date: 2024-07-24 18:19:09.088196+00:00
+Create Date: 2024-08-06 12:53:18.711268+00:00
 
 """
 
@@ -14,7 +14,7 @@ from alembic import op
 
 
 # revision identifiers, used by Alembic.
-revision: str = "34c3743f15ed"
+revision: str = "f1431b1ad6e6"
 down_revision: Union[str, None] = None
 branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
@@ -30,6 +30,7 @@ def upgrade() -> None:
         sa.Column("timestamp", sa.DateTime(), nullable=False),
         sa.Column("downloaded_at", sa.DateTime(), nullable=True),
         sa.Column("imported_at", sa.DateTime(), nullable=True),
+        sa.Column("download_errors", sa.Integer(), nullable=False),
         sa.PrimaryKeyConstraint("id"),
     )
     op.create_index(op.f("ix_collection_file_file_name"), "collection_file", ["file_name"], unique=True)

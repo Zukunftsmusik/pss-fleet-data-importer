@@ -11,6 +11,7 @@ class CollectionFileBase(SQLModel):
     timestamp: datetime = Field(index=True, unique=True)
     downloaded_at: Optional[datetime] = Field(default=None, nullable=True)
     imported_at: Optional[datetime] = Field(default=None, nullable=True)
+    download_errors: int = Field(default=0)
 
 
 class CollectionFileDB(CollectionFileBase, table=True):
