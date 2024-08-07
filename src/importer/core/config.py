@@ -23,6 +23,7 @@ class Config:
     earliest_data_date: datetime = datetime(2019, 10, 10, tzinfo=timezone.utc)
     temp_download_folder: Path = Path("./downloads")
     download_thread_pool_size: int = int(os.getenv("FLEET_DATA_IMPORTER_WORKER_COUNT", 2))
+    log_folder: Optional[str] = os.getenv("LOG_FOLDER_PATH")
 
     # PSS Fleet Data API
     api_default_server_url: str = os.getenv("FLEET_DATA_API_URL", "https://fleetdata.dolores2.xyz")
@@ -63,6 +64,22 @@ class Config:
         return self.db_url.split("@")[1]
 
     @property
+    def log_file_name(self) -> Optional[Path]:
+        return "pss_fleet_data_importer_" + datetime.now(tz=timezone.utc).strftime("%Y%m%d-%H%M%S") + ".log"
+
+    @property
+    def log_file_path(self) -> Optional[Path]:
+        if self.log_folder_path:
+            return self.log_folder_path.joinpath(self.log_file_name)
+        return None
+
+    @property
+    def log_folder_path(self) -> Optional[Path]:
+        if self.log_folder:
+            return Path(self.log_folder)
+        return None
+
+    @property
     def log_level(self) -> int:
         from_env = os.getenv("LOG_LEVEL")
         if from_env:
@@ -79,94 +96,114 @@ class Config:
         result.setLevel(self.log_level)
         return result
 
-    def configure_logging(self, config: Optional[dict] = None):
-        config = config or LOGGING_BASE_CONFIG
-        config = dict(config)
-        logging.config.dictConfig(config)
+    def configure_logging(self, logging_config: dict):
+        logging_config = logging_config
+        logging_config = dict(logging_config)
+        logging.config.dictConfig(logging_config)
         logging.Formatter.converter = time.gmtime
 
 
+def get_logging_base_config(config: Config):
+    logging_base_config = {
+        "version": 1,
+        "disable_existing_loggers": False,
+        "formatters": {
+            "standard": {
+                "format": "%(levelname)-8.8s  [%(name)s]  %(message)s",
+            },
+            "standard_with_time": {
+                "format": "%(asctime)s  %(levelname)-8.8s  [%(name)s] %(message)s",
+                "datefmt": "%Y-%m-%d %H:%M:%S",
+            },
+            "standard_file": {
+                "format": "%(levelname)-8.8s  [%(name)s] (%(thread)-8.8d)  %(message)s",
+            },
+            "standard_file_with_time": {
+                "format": "%(asctime)s  %(levelname)-8.8s  [%(name)s] (%(thread)-8.8d)  %(message)s",
+                "datefmt": "%Y-%m-%d %H:%M:%S",
+            },
+            "alembic_generic": {
+                "format": "%(levelname)-8.8s  [%(name)s]  %(message)s",
+                "datefmt": "%H:%M:%S",
+            },
+        },
+        "filters": {
+            "remove_src": {"()": logger.RemoveSrcFromLoggerNameFilter},
+        },
+        "handlers": {
+            "alembic_console": {
+                "level": logging.NOTSET,
+                "formatter": "alembic_generic",
+                "class": "logging.StreamHandler",
+                "stream": "ext://sys.stderr",
+            },
+            "nullhandler": {
+                "level": logging.DEBUG,
+                "class": "logging.NullHandler",
+            },
+            "stderr": {
+                "level": logging.NOTSET,
+                "formatter": "standard",
+                "class": "logging.StreamHandler",
+                "stream": "ext://sys.stderr",
+                "filters": ["remove_src"],
+            },
+            "stderr_with_time": {
+                "level": logging.NOTSET,
+                "formatter": "standard_with_time",
+                "class": "logging.StreamHandler",
+                "stream": "ext://sys.stderr",
+                "filters": ["remove_src"],
+            },
+            "log_file": {
+                "level": logging.DEBUG,
+                "formatter": "standard_file_with_time",
+                "class": "logging.FileHandler",
+                "filename": config.log_file_path,
+                "delay": True,
+                "filters": ["remove_src"],
+            },
+        },
+        "loggers": {
+            "importer": {
+                "handlers": ["stderr", "log_file"] if config.log_file_path else ["stderr"],
+                "level": config.log_level,
+                "propagate": False,
+            },
+            "": {  # root logger
+                "handlers": ["alembic_console"],
+                "level": logging.WARN,
+            },
+            "sqlalchemy.engine.Engine": {
+                "handlers": ["nullhandler"],  # Suppress logging to prevent duplication of log messages
+                "level": logging.WARN,
+                "propagate": False,
+            },
+            "sqlalchemy.engine": {
+                "handlers": ["alembic_console"],
+                "level": logging.WARN,
+                "propagate": False,
+            },
+            "alembic": {
+                "handlers": ["alembic_console"],
+                "level": max(logging.INFO, config.log_level),
+                "propagate": False,
+            },
+        },
+    }
+
+    return logging_base_config
+
+
 __CONFIG = Config()
-
-
-LOGGING_BASE_CONFIG = {
-    "version": 1,
-    "disable_existing_loggers": False,
-    "formatters": {
-        "standard": {
-            "format": "%(levelname)-8.8s  [%(name)s]  %(message)s",
-        },
-        "standard_with_time": {
-            "format": "%(asctime)s  %(levelname)-8.8s  [%(name)s]  %(message)s",
-            "datefmt": "%Y-%m-%d %H:%M:%S",
-        },
-        "alembic_generic": {
-            "format": "%(levelname)-8.8s  [%(name)s]  %(message)s",
-            "datefmt": "%H:%M:%S",
-        },
-    },
-    "filters": {
-        "remove_src": {"()": logger.RemoveSrcFromLoggerNameFilter},
-    },
-    "handlers": {
-        "alembic_console": {
-            "level": logging.NOTSET,
-            "formatter": "alembic_generic",
-            "class": "logging.StreamHandler",
-            "stream": "ext://sys.stderr",
-        },
-        "nullhandler": {
-            "level": logging.DEBUG,
-            "class": "logging.NullHandler",
-        },
-        "stderr": {
-            "level": logging.NOTSET,
-            "formatter": "standard",
-            "class": "logging.StreamHandler",
-            "stream": "ext://sys.stderr",
-            "filters": ["remove_src"],
-        },
-        "stderr_with_time": {
-            "level": logging.NOTSET,
-            "formatter": "standard_with_time",
-            "class": "logging.StreamHandler",
-            "stream": "ext://sys.stderr",
-            "filters": ["remove_src"],
-        },
-    },
-    "loggers": {
-        "importer": {
-            "handlers": ["stderr"],
-            "level": get_config().log_level,
-            "propagate": False,
-        },
-        "": {  # root logger
-            "handlers": ["alembic_console"],
-            "level": logging.WARN,
-        },
-        "sqlalchemy.engine.Engine": {
-            "handlers": ["nullhandler"],  # Suppress logging to prevent duplication of log messages
-            "level": logging.WARN,
-            "propagate": False,
-        },
-        "sqlalchemy.engine": {
-            "handlers": ["alembic_console"],
-            "level": logging.WARN,
-            "propagate": False,
-        },
-        "alembic": {
-            "handlers": ["alembic_console"],
-            "level": max(logging.INFO, get_config().log_level),
-            "propagate": False,
-        },
-    },
-}
-
-
-__CONFIG.configure_logging(LOGGING_BASE_CONFIG)
+if __CONFIG.log_folder_path:
+    __CONFIG.log_folder_path.mkdir(parents=True, exist_ok=True)
 
 
 __all__ = [
+    # Classes
     Config.__name__,
+    # Functions
     get_config.__name__,
+    get_logging_base_config.__name__,
 ]
