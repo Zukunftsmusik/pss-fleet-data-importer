@@ -1,4 +1,3 @@
-from ..database.models import CollectionFileBase, CollectionFileDB
 from . import converters
 from .collection_file_change import CollectionFileChange
 from .queue_item import CollectionFileQueueItem
@@ -6,11 +5,9 @@ from .status import ImportStatus, StatusFlag
 
 
 __all__ = [
-    # Modules
+    # Module
     converters.__name__,
     # Classes
-    CollectionFileBase.__name__,
-    CollectionFileDB.__name__,
     CollectionFileChange.__name__,
     CollectionFileQueueItem.__name__,
     ImportStatus.__name__,
