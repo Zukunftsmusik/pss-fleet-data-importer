@@ -1,6 +1,7 @@
 import asyncio
 import json
 import queue
+import random
 import threading
 import time
 from concurrent.futures import CancelledError, Future, ThreadPoolExecutor
@@ -19,12 +20,8 @@ from ..database import AsyncAutoRollbackSession, Database, crud
 from ..models import CollectionFileChange, CollectionFileQueueItem, ImportStatus, StatusFlag
 from ..models.converters import FromCollectionFileDB, FromGdriveFile
 from . import utils, wrapper
-from .config import Config, get_config
+from .config import Config
 from .gdrive import GoogleDriveClient, GoogleDriveFile
-
-
-if get_config().debug_mode:
-    pass
 
 
 class Importer:
@@ -45,7 +42,7 @@ class Importer:
         self.logger: Logger = self.__config.logger.getChild(Importer.__name__)
         self.status = ImportStatus()
         self.thread_pool_size: int = download_thread_pool_size
-        self.temp_download_folder: Path = temp_download_folder or get_config().temp_download_folder
+        self.temp_download_folder: Path = temp_download_folder or self.__config.temp_download_folder
 
         self.__database: Database = database
         self.__api_key: str = api_key or self.__config.api_key
@@ -70,6 +67,7 @@ class Importer:
             self.gdrive_folder_id,
             config.gdrive_service_account_file_path,
             config.gdrive_settings_file_path,
+            logger=config.logger,
         )
 
         self.__fleet_data_client: PssFleetDataClient = PssFleetDataClient(self.api_server_url, self.__api_key)
@@ -102,17 +100,13 @@ class Importer:
             await asyncio.sleep(wait_for_seconds)
 
     async def run_bulk_import(self, modified_after: Optional[datetime] = None, modified_before: Optional[datetime] = None) -> bool:
-        print(f"### Starting bulk import at: {datetime.now(tz=timezone.utc).isoformat()}")
+        start = utils.get_now()
+        print(f"### Starting bulk import at: {start.isoformat()}")
 
         log_bulk_import_start(self.logger, modified_after, modified_before)
 
-        gdrive_files = list(
-            wrapper.debug_log_running_time(self.logger, "Downloading file list")(
-                self.__gdrive_client.list_files_by_modified_date,
-                modified_after,
-                modified_before,
-            )
-        )
+        gdrive_files = self.__gdrive_client.list_files_by_modified_date(modified_after, modified_before)
+        gdrive_files = wrapper.debug_log_running_time(self.logger, "Downloading file list")(list, gdrive_files)
 
         if not gdrive_files:
             self.logger.info("No new files found to be imported.")
@@ -122,12 +116,12 @@ class Importer:
 
         self.logger.debug("Creating database entries.")
         collection_files = [FromGdriveFile.to_collection_file(gdrive_file) for gdrive_file in gdrive_files]
+        collection_files.sort(key=lambda file: file.file_name.replace("-", "_"))  # There're files where some underscores are hyphens.
         async with AsyncAutoRollbackSession(self.__database) as session:
             collection_files = await crud.insert_new_collection_files(session, collection_files)
 
         self.logger.debug("Creating queue items.")
         queue_items = FromCollectionFileDB.to_queue_items(gdrive_files, collection_files, self.temp_download_folder, self.status.cancel_token)
-        queue_items.sort(key=lambda queue_item: queue_item.gdrive_file_name.replace("-", "_"))  # There're files where some underscores are hyphens.
 
         self.logger.debug("Ensuring that download path '%s' exists.", self.temp_download_folder)
         self.temp_download_folder.mkdir(parents=True, exist_ok=True)
@@ -183,7 +177,8 @@ class Importer:
         database_thread.join()
 
         log_bulk_import_finish(self.logger, len(queue_items), modified_after, modified_before)
-        print(f"### Finished bulk import of {len(queue_items)} files at: {datetime.now(tz=timezone.utc).isoformat()}")
+        end = utils.get_now()
+        print(f"### Finished bulk import of {len(queue_items)} files at: {end.isoformat()} (after: {end-start})")
 
         return True
 
@@ -257,9 +252,10 @@ def worker_download(
 
     executor = ThreadPoolExecutor(thread_pool_size)
     futures: list[Future] = []
+    logger.debug("Setting up thread pool for downloads with %i workers.", thread_pool_size)
     for queue_item in queue_items:
         if cancel_token.cancelled:
-            logger.warn("Requested cancellation during setup.")
+            logger.warn("Requested cancellation during thread pool setup.")
             break
 
         futures.append(executor.submit(download_gdrive_file, queue_item, gdrive_client, logger, debug_mode))
@@ -274,6 +270,7 @@ def worker_download(
             if not future.done():
                 future.cancel()
 
+            logger.debug("Shutting down thread pool, waiting for running downloads to complete.")
             executor.shutdown(cancel_futures=True)
 
         if future.cancelled():
@@ -388,7 +385,7 @@ def download_gdrive_file(
     else:
         queue_item.target_file_path.unlink(missing_ok=True)  # File also counts as not existing, if the file size differs from the file on gdrive
 
-        for _ in range(2):
+        for attempt in range(2):
             try:
                 downloaded_file_path = gdrive_client.download_file(queue_item.gdrive_file, queue_item.target_directory_path)
                 logger.debug("File no. %i downloaded: %s", queue_item.item_no, queue_item.target_file_path)
@@ -397,6 +394,8 @@ def download_gdrive_file(
             except pydrive2.files.ApiRequestError as exc:
                 log_gdrive_error(logger, queue_item, debug_mode, exc)
                 queue_item.error_while_downloading = True
+                sleep_for = timedelta(seconds=2 ^ attempt, microseconds=random.randint(0, 1000000))
+                time.sleep(sleep_for.total_seconds())  # Wait for a increasing time before retrying
 
     if queue_item.cancel_token.cancelled:
         logger.debug("Cancelled download of file no. %i: %s", queue_item.item_no, queue_item.gdrive_file_name)
@@ -404,7 +403,11 @@ def download_gdrive_file(
 
     queue_item.download_file_path = downloaded_file_path
 
-    while not check_if_exists(queue_item, downloaded_file_path):
+    log_waiting = True
+    while not queue_item.error_while_downloading and not check_if_exists(queue_item, downloaded_file_path):
+        if log_waiting:
+            logger.debug("Waiting for file no. %i to complete disk write: %s", queue_item.item_no, queue_item.target_file_path)
+            log_waiting = False
         time.sleep(0.1)  # It may take some time for the file content to be written to disk
 
     return queue_item
@@ -536,16 +539,9 @@ async def skip_file_import_on_error(logger: Logger, file_no: int, queue_item: Co
     if queue_item.cancel_token.cancelled:
         return True
 
-    # # Wait until file is downloaded, since multiple downloads are running simultaneously, but import needs to be done in order.
-    # await wait_until_file_downloaded(logger, file_no, queue_item)
-    # if queue_item.error_while_downloading:
-    #     logger.warn("Error while downloading. Skipping file no. %i: %s", file_no, queue_item.gdrive_file_name)
-    #     return True
-
-    # # Sometimes the file is flagged as downloaded, but still empty on disk
-    # if await check_if_file_empty(logger, file_no, queue_item):
-    #     logger.warn("File is empty. Skipping file no. %i: %s", file_no, queue_item.download_file_path)
-    #     return True
+    if queue_item.error_while_downloading:
+        logger.warn("Error while downloading. Skipping file no. %i: %s", file_no, queue_item.gdrive_file_name)
+        return True
 
     with open(queue_item.download_file_path, "r") as fp:
         contents = json.load(fp)
