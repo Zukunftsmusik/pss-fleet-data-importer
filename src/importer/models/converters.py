@@ -18,6 +18,7 @@ class FromGdriveFile:
         collection_file = CollectionFileDB(
             gdrive_file_id=gdrive_file["id"],
             file_name=file_name,
+            gdrive_modified_date=gdrive_file["modifiedDate"],
             timestamp=timestamp,
         )
         return collection_file

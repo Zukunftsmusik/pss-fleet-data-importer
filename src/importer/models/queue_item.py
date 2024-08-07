@@ -1,6 +1,9 @@
+from datetime import datetime
 from pathlib import Path
 from threading import Lock
 
+import dateutil
+import dateutil.parser
 from cancel_token import CancellationToken
 from pydrive2.files import GoogleDriveFile
 
@@ -72,6 +75,10 @@ class CollectionFileQueueItem:
     @property
     def gdrive_file_name(self) -> str:
         return utils.get_gdrive_file_name(self.gdrive_file)
+
+    @property
+    def gdrive_modified_date(self) -> datetime:
+        return dateutil.parser.parse(self.gdrive_file["modifiedDate"])
 
     @property
     def target_directory_path(self) -> Path:
