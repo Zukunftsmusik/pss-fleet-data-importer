@@ -215,7 +215,7 @@ async def worker_db(
             queue_item, change = database_queue.get(block=False)
         except queue.Empty:
             if any(watch_flags):
-                await asyncio.sleep(1)
+                await asyncio.sleep(0.1)
                 continue
             break
 
