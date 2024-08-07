@@ -1,13 +1,8 @@
-from . import utils
-from .config import get_config
-from .importer import Importer
+from . import config, utils
 
 
 __all__ = [
-    # functions
-    get_config.__name__,
-    # classes
-    Importer.__name__,
     # modules
+    config.__name__,
     utils.__name__,
 ]

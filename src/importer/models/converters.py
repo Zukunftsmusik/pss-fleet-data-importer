@@ -6,7 +6,7 @@ from pydrive2.files import GoogleDriveFile
 
 from ..core import utils
 from ..database.models import CollectionFileDB
-from ..models.queue_item import CollectionFileQueueItem
+from .queue_item import CollectionFileQueueItem
 
 
 class FromGdriveFile:

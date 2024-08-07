@@ -5,7 +5,9 @@ from cancel_token import CancellationToken
 from pydrive2.files import GoogleDriveFile
 
 from ..core import utils
-from ..database import AsyncAutoRollbackSession, CollectionFileDB, Database, crud
+from ..database import crud
+from ..database.db import AsyncAutoRollbackSession, Database
+from ..database.models import CollectionFileDB
 from .collection_file_change import CollectionFileChange
 
 

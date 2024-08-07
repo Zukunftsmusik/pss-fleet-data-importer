@@ -11,7 +11,7 @@ import pydrive2.files
 import yaml
 from pydrive2.files import GoogleDriveFile, GoogleDriveFileList
 
-from . import get_config, utils
+from . import utils
 
 
 class GoogleDriveClient:
@@ -26,8 +26,9 @@ class GoogleDriveClient:
         folder_id: str,
         service_account_file_path: str,
         settings_file_path: str,
+        logger: Optional[logging.Logger] = None,
     ) -> None:
-        self.__logger = get_config().logger.getChild(GoogleDriveClient.__name__)
+        self.__logger = logger.getChild(GoogleDriveClient.__name__) if logger else logging.getLogger(GoogleDriveClient.__name__)
 
         self.logger.info(f"Creating {GoogleDriveClient.__name__}")
 
