@@ -9,7 +9,7 @@
 #   generate-hashes: false
 #   universal: false
 
-aiohappyeyeballs==2.3.4
+aiohappyeyeballs==2.3.5
     # via aiohttp
 aiohttp==3.10.1
     # via pssapi
@@ -23,7 +23,7 @@ anyio==4.4.0
 apscheduler==3.10.4
     # via pssapi
 asyncpg==0.29.0
-attrs==24.1.0
+attrs==24.2.0
     # via aiohttp
     # via flake8-bugbear
 autoflake==2.3.1
@@ -36,7 +36,7 @@ certifi==2024.7.4
     # via httpcore
     # via httpx
     # via requests
-cffi==1.16.0
+cffi==1.17.0
     # via cryptography
 cfgv==3.4.0
     # via pre-commit
@@ -62,9 +62,9 @@ frozenlist==1.4.1
     # via aiosignal
 google-api-core==2.19.1
     # via google-api-python-client
-google-api-python-client==2.139.0
+google-api-python-client==2.140.0
     # via pydrive2
-google-auth==2.32.0
+google-auth==2.33.0
     # via google-api-core
     # via google-api-python-client
     # via google-auth-httplib2
@@ -171,7 +171,7 @@ python-dateutil==2.9.0.post0
 pytz==2022.7.1
     # via apscheduler
     # via pssapi
-pyyaml==6.0.1
+pyyaml==6.0.2
     # via pre-commit
     # via pydrive2
     # via vcrpy
@@ -193,6 +193,7 @@ sqlalchemy==2.0.32
     # via sqlmodel
 sqlalchemy-utils==0.41.2
 sqlmodel==0.0.21
+stopit==1.1.2
 typing-extensions==4.12.2
     # via alembic
     # via pydantic

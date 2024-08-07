@@ -15,6 +15,7 @@ dependencies = [
     "PyDrive2>=1.20.0",
     "sqlalchemy-utils>=0.41.2",
     "sqlmodel>=0.0.20",
+    "stopit>=1.1.2",
 ]
 readme = "README.md"
 requires-python = ">= 3.12"
