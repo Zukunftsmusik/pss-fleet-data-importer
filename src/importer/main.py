@@ -3,8 +3,8 @@ import logging
 import sys
 
 from .core import config
-from .core.importer import Importer
 from .database import db
+from .importer import Importer
 
 
 def main():
