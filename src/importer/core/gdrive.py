@@ -10,7 +10,6 @@ import pydrive2.drive
 import pydrive2.files
 import yaml
 from pydrive2.files import GoogleDriveFile, GoogleDriveFileList
-from stopit import ThreadingTimeout, TimeoutException
 
 from . import utils
 
@@ -60,10 +59,10 @@ class GoogleDriveClient:
 
         try:
             self.logger.debug("Downloading file '%s' to: %s", file_name, target_file_path)
-            with ThreadingTimeout(10, swallow_exc=False):
-                file.GetContentFile(target_file_path, mimetype="application/json")
+            # time.sleep(10)
+            file.GetContentFile(target_file_path, mimetype="application/json")
             self.logger.debug("Downloaded file '%s' to: %s", file_name, target_file_path)
-        except (pydrive2.files.ApiRequestError, pydrive2.files.FileNotDownloadableError, TimeoutException) as exc:
+        except (pydrive2.files.ApiRequestError, pydrive2.files.FileNotDownloadableError) as exc:
             self.logger.warn("An error occured while downloading file '%s': %s", file_name, exc)
             target_file_path.unlink(missing_ok=True)
             raise exc

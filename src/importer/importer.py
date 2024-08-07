@@ -8,7 +8,7 @@ from concurrent.futures import CancelledError, Future, ThreadPoolExecutor
 from datetime import datetime, timedelta, timezone
 from logging import Logger
 from pathlib import Path
-from typing import Iterable, Optional
+from typing import Iterable, Optional, Union
 
 import pydrive2.files
 from cancel_token import CancellationToken
@@ -102,6 +102,7 @@ class Importer:
 
         log_bulk_import_start(self.logger, modified_after, modified_before)
 
+        self.logger.debug("Downloading Google Drive file list.")
         gdrive_files = self.__gdrive_client.list_files_by_modified_date(modified_after, modified_before)
         gdrive_files = wrapper.debug_log_running_time(self.logger, "Downloading file list")(list, gdrive_files)
 
@@ -155,7 +156,7 @@ class Importer:
             self.__config.keep_downloaded_files,
             daemon=True,
         )
-        import_thread.start()
+        # import_thread.start()
 
         database_thread = utils.create_async_thread(
             worker_db,
@@ -170,7 +171,7 @@ class Importer:
         database_thread.start()
 
         download_thread.join()
-        import_thread.join()
+        # import_thread.join()
         database_thread.join()
 
         log_bulk_import_finish(self.logger, len(queue_items), modified_after, modified_before)
@@ -247,7 +248,7 @@ def worker_download(
     parent_logger.info("Download worker started...")
     logger = parent_logger.getChild("downloadWorker")
 
-    executor = ThreadPoolExecutor(thread_pool_size)
+    executor = ThreadPoolExecutor(2 or thread_pool_size)  # TODO: Remove 1 before deploying :D
     futures: list[Future] = []
     logger.debug("Setting up thread pool for downloads with %i workers.", thread_pool_size)
     for queue_item in queue_items:
@@ -255,10 +256,10 @@ def worker_download(
             logger.warn("Requested cancellation during thread pool setup.")
             break
 
-        futures.append(executor.submit(download_gdrive_file, queue_item, gdrive_client, logger, debug_mode))
+        futures.append(executor.submit(download_gdrive_file, queue_item, gdrive_client, logger, debug_mode, max_attempts=1))
 
     log_cancellation = True
-    for i, future in enumerate(futures):
+    for i, future in enumerate(futures, 1):
         if cancel_token.cancelled:
             if log_cancellation:
                 logger.warn("Requested cancellation at queue item no.: %i", i)
@@ -269,19 +270,20 @@ def worker_download(
 
             logger.debug("Shutting down thread pool, waiting for running downloads to complete.")
             executor.shutdown(cancel_futures=True)
+            break
 
         if future.cancelled():
             continue
 
-        while not future.running():
-            time.sleep(1)
-
         try:
-            queue_item: CollectionFileQueueItem = future.result(timeout=60.0)
+            queue_item: CollectionFileQueueItem = future.result(3)
         except CancelledError:
             continue
         except TimeoutError:
-            continue
+            future.set_exception(KeyboardInterrupt)
+            logger.warn("Future no. %i timed out.", i)
+            cancel_token.cancel()
+            continue  # Using break here to exit the worker and subsequently make the bulk import restart.
         except Exception as exc:
             logger.warn("Future no. %i raised an error: %s", i, type(exc))
             continue
@@ -318,12 +320,14 @@ async def worker_import(
     logger = parent_logger.parent.getChild("importWorker")
 
     log_queue_empty = True
+    queue_item: CollectionFileQueueItem = None
+
     while not cancel_token.cancelled:
         try:
-            queue_item: CollectionFileQueueItem = import_queue.get(block=False)
+            queue_item = import_queue.get(block=False)
         except queue.Empty:
             if any(watch_flags):
-                if log_queue_empty:
+                if log_queue_empty and queue_item:
                     logger.debug("Download worker is running, but queue is empty after item no. %i", queue_item.item_no)
                     queue_item = None
                     log_queue_empty = False
@@ -382,10 +386,9 @@ def download_gdrive_file(
     parent_logger: Logger,
     debug_mode: bool,
     max_attempts: int = 5,
-    disk_write_timeout: float = 10,
 ) -> Optional[CollectionFileQueueItem]:
     logger = parent_logger.getChild("downloadGdriveFile")
-    gdrive_error: pydrive2.files.ApiRequestError = None
+    download_error: Union[pydrive2.files.ApiRequestError, pydrive2.files.FileNotDownloadableError] = None
 
     for attempt in range(max_attempts):
         if queue_item.cancel_token.cancelled:
@@ -399,10 +402,11 @@ def download_gdrive_file(
         else:
             logger.debug("Downloading file no. %i: %s", queue_item.item_no, queue_item.gdrive_file_name)
 
-        if check_if_exists(queue_item, logger=logger):
+        if check_if_exists(queue_item, check_path=queue_item.target_file_path):
             queue_item.download_file_path = queue_item.target_file_path
             logger.debug("File no. %i already exists: %s", queue_item.item_no, queue_item.download_file_path)
         else:
+            logger.debug("Making sure that file no. %i does not exist.", queue_item.item_no)
             queue_item.target_file_path.unlink(missing_ok=True)  # File also counts as not existing, if the file size differs from the file on gdrive
 
             try:
@@ -412,12 +416,12 @@ def download_gdrive_file(
                 queue_item.error_while_downloading = False
 
                 logger.debug("File no. %i downloaded: %s", queue_item.item_no, queue_item.target_file_path)
-            except (pydrive2.files.ApiRequestError, pydrive2.files.FileNotDownloadableError) as gdrive_error:
+            except (pydrive2.files.ApiRequestError, pydrive2.files.FileNotDownloadableError) as download_error:
                 queue_item.download_file_path = None
                 queue_item.error_while_downloading = True
 
                 sleep_for = timedelta(seconds=2 ^ attempt, microseconds=random.randint(0, 1000000))
-                log_gdrive_error(logger, queue_item, debug_mode, gdrive_error, sleep_for)
+                log_download_error(logger, queue_item, debug_mode, download_error, sleep_for)
                 time.sleep(sleep_for.total_seconds())  # Wait for a increasing time before retrying
                 continue
 
@@ -428,7 +432,7 @@ def download_gdrive_file(
         log_waiting = True
         wait_count = 0
         if not queue_item.error_while_downloading:
-            while not check_if_exists(queue_item, download_file_path=queue_item.download_file_path, logger=logger):
+            while not check_if_exists(queue_item, check_path=queue_item.download_file_path):
                 if queue_item.cancel_token.cancelled:
                     logger.debug("Cancelled download of file no. %i: %s", queue_item.item_no, queue_item.gdrive_file_name)
                     return None
@@ -448,11 +452,11 @@ def download_gdrive_file(
 
         return queue_item
 
-    raise DownloadFailedError(queue_item.gdrive_file_name, gdrive_error.strerror)
+    raise DownloadFailedError(queue_item.gdrive_file_name, download_error.strerror)
 
 
-def check_if_exists(queue_item: CollectionFileQueueItem, download_file_path: Optional[Path] = None, logger: Optional[Logger] = None):
-    check_path = download_file_path or queue_item.target_file_path
+def check_if_exists(queue_item: CollectionFileQueueItem, check_path: Optional[Path] = None, logger: Optional[Logger] = None):
+    check_path = check_path or queue_item.target_file_path
     if logger:
         logger.debug("Checking if file no. %i exists at: %s", queue_item.item_no, check_path)
 
@@ -575,7 +579,7 @@ def log_get_gdrive_file_list_params(logger: Logger, modified_after: Optional[dat
         logger.info("Retrieving all gdrive files.")
 
 
-def log_gdrive_error(logger: Logger, queue_item: CollectionFileQueueItem, log_exception: bool, exc: ApiRequestError, sleep_for: timedelta):
+def log_download_error(logger: Logger, queue_item: CollectionFileQueueItem, log_exception: bool, exc: ApiRequestError, sleep_for: timedelta):
     msg = f"An error occured while downloading the file no. {queue_item.item_no} '{queue_item.gdrive_file_name}' from Drive. Retrying in {sleep_for.total_seconds():.2f} seconds."
     if log_exception:
         logger.error(msg, exc_info=exc)
