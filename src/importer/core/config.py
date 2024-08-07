@@ -155,14 +155,6 @@ def get_logging_base_config(config: Config):
                 "stream": "ext://sys.stderr",
                 "filters": ["remove_src"],
             },
-            "log_file": {
-                "level": logging.DEBUG,
-                "formatter": "standard_file_with_time",
-                "class": "logging.FileHandler",
-                "filename": config.log_file_path,
-                "delay": True,
-                "filters": ["remove_src"],
-            },
         },
         "loggers": {
             "importer": {
@@ -191,6 +183,16 @@ def get_logging_base_config(config: Config):
             },
         },
     }
+
+    if config.log_file_path:
+        logging_base_config["handlers"]["log_file"] = {
+            "level": logging.DEBUG,
+            "formatter": "standard_file_with_time",
+            "class": "logging.FileHandler",
+            "filename": config.log_file_path,
+            "delay": True,
+            "filters": ["remove_src"],
+        }
 
     return logging_base_config
 
