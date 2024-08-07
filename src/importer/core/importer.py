@@ -78,9 +78,6 @@ class Importer:
 
     async def run_import_loop(self, modified_after: Optional[datetime] = None, modified_before: Optional[datetime] = None):
         while not self.status.cancel_token.cancelled:
-            while self.status.bulk_database_running:
-                await asyncio.sleep(0.1)
-
             after = modified_after
             if not modified_after:
                 async with AsyncAutoRollbackSession(self.__database) as session:
@@ -90,7 +87,6 @@ class Importer:
             did_import = await self.run_bulk_import(modified_after=after, modified_before=modified_before)
 
             if did_import:
-                await asyncio.sleep(1)  # Wait a second for database transactions to finish
                 continue
 
             now = utils.get_now()
