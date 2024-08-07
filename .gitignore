@@ -1,6 +1,13 @@
+# env files
 .env
 .docker-env
+
+# coverage file
 cov.xml
+.coverage
+
+# log file folder
+logs/
 
 # Google Drive Auth
 client_secrets.json
