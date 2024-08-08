@@ -39,8 +39,8 @@ def main():
     print("  Starting import loop.")
 
     try:
-        # asyncio.run(importer.run_import_loop(modified_before=datetime(2019, 11, 1)))
-        # asyncio.run(importer.run_import_loop(modified_after=datetime(2022, 1, 28), modified_before=datetime(2022, 1, 29)))
+        # asyncio.run(importer.run_import_loop(modified_before=datetime(2019, 10, 20)))
+        # asyncio.run(importer.run_import_loop(modified_after=datetime(2021, 11, 11), modified_before=datetime(2021, 11, 12)))
         asyncio.run(importer.run_import_loop())
     except KeyboardInterrupt:
         configuration.logger.warn("\nAborted by user, shutting down.")
