@@ -9,6 +9,17 @@ class OperationCanceledError(Exception):
 
 
 class CancellationToken(CT):
+    def log_if_cancelled(
+        self,
+        logger: logging.Logger,
+        log_message: str,
+        *log_message_args: Any,
+        log_level: int = logging.WARN,
+    ) -> bool:
+        if self.cancelled:
+            logger.log(log_level, log_message, *log_message_args)
+        return self.cancelled
+
     def raise_if_cancelled(
         self,
         logger: logging.Logger = None,
@@ -16,8 +27,9 @@ class CancellationToken(CT):
         *log_message_args: Any,
         log_level: int = logging.WARN,
         exception_message: str = None,
-    ):
+    ) -> bool:
         if self.cancelled:
             if logger and log_message:
                 logger.log(log_level, log_message, *log_message_args)
             raise OperationCanceledError(exception_message or "")
+        return False
