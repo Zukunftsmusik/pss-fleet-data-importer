@@ -28,7 +28,7 @@ format:
 # testing
 .PHONY: coverage
 coverage:
-	pytest --cov=./src/importer --cov-report=xml:cov.xml
+	pytest --cov=./src/app --cov-report=xml:cov.xml
 
 .PHONY: test
 test:

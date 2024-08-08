@@ -2,7 +2,7 @@ from datetime import datetime
 
 import pytest
 
-from src.importer.core.utils import extract_timestamp_from_gdrive_file_name
+from src.app.core.utils import extract_timestamp_from_gdrive_file_name
 
 
 test_cases_valid = [

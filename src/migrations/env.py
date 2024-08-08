@@ -4,8 +4,8 @@ from alembic import context
 from sqlalchemy import engine_from_config, pool
 from sqlmodel import SQLModel
 
-from src.importer.core.config import get_config
-from src.importer.database.models import CollectionFileDB  # noqa: F401
+from src.app.core.config import get_config
+from src.app.database.models import CollectionFileDB  # noqa: F401
 
 
 # this is the Alembic Config object, which provides

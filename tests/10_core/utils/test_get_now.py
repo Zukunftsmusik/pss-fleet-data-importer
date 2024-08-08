@@ -1,6 +1,6 @@
 import asyncio
 
-from src.importer.core.utils import get_now
+from src.app.core.utils import get_now
 
 
 async def test_get_now():

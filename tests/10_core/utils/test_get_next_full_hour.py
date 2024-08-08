@@ -2,7 +2,7 @@ from datetime import datetime, timezone
 
 import pytest
 
-from src.importer.core.utils import get_next_full_hour
+from src.app.core.utils import get_next_full_hour
 
 
 test_cases = [

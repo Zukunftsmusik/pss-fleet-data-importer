@@ -55,12 +55,12 @@ target-version = ['py312']
 include = '\.pyi?$'
 
 [tool.isort]
-src_paths = ["src"]
+src_paths = ["src", "tests"]
 profile = "black"
 line_length = 150
 lines_after_imports = 2
 
 [tool.vulture]
 min_confidence = 100
-paths = ["./src/importer"]
+paths = ["./src/app"]
 sort_by_size = true

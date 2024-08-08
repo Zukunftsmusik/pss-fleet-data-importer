@@ -3,7 +3,7 @@ from datetime import datetime
 import pytest
 from dateutil.parser import parse as parse_datetime
 
-from src.importer.core.utils import remove_timezone
+from src.app.core.utils import remove_timezone
 
 
 test_cases_invalid = [

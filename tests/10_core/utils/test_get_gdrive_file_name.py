@@ -1,7 +1,7 @@
 import pytest
 from pydrive2.files import GoogleDriveFile
 
-from src.importer.core.utils import get_gdrive_file_name
+from src.app.core.utils import get_gdrive_file_name
 
 
 test_cases = [
