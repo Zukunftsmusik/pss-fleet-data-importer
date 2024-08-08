@@ -48,7 +48,6 @@ class Importer:
         self.__database: Database = database
         self.__api_key: str = api_key or self.__config.api_key
 
-        self.__download_queue: list[CollectionFileQueueItem] = []
         self.__import_queue: queue.Queue = queue.Queue()
         self.__database_queue: queue.Queue = queue.Queue()
 
@@ -187,8 +186,8 @@ class Importer:
         for thread in worker_threads:
             thread.join()
 
-        log_bulk_import_finish(self.logger, len(queue_items), modified_after, modified_before)
         end = utils.get_now()
+        log_bulk_import_finish(self.logger, queue_items, modified_after, modified_before)
         print(f"### Finished bulk import of {len(queue_items)} files at: {end.isoformat()} (after: {end-start})")
 
         return True
@@ -551,22 +550,31 @@ def create_queues(queue_items: list[CollectionFileQueueItem]) -> tuple[list[tupl
     return download_queue_items, import_queue
 
 
-def log_bulk_import_finish(logger: Logger, file_count: int, modified_after: Optional[datetime], modified_before: Optional[datetime]):
+def log_bulk_import_finish(
+    logger: Logger, queue_items: list[CollectionFileQueueItem], modified_after: Optional[datetime], modified_before: Optional[datetime]
+):
+    total_item_count = len(queue_items)
+    downloaded_item_count = len([queue_item for queue_item in queue_items if queue_item.collection_file.downloaded_at])
+    imported_item_count = len([queue_item for queue_item in queue_items if queue_item.collection_file.imported_at])
+
+    base_message = f"Finished bulk import. Downloaded {downloaded_item_count}, imported {imported_item_count} out of {total_item_count} files"
+
     if modified_after:
         if modified_before:
             logger.info(
-                "Finished bulk import of %i files modified after %s & modified before %s.",
-                file_count,
+                "%s modified after %s & modified before %s.",
+                base_message,
+                total_item_count,
                 modified_after.isoformat(),
                 modified_before.isoformat(),
             )
         else:
-            logger.info("Finished bulk import of %i files modified after %s.", file_count, modified_after.isoformat())
+            logger.info("%s modified after %s.", base_message, total_item_count, modified_after.isoformat())
     else:
         if modified_before:
-            logger.info("Finished bulk import of %i files modified before %s.", file_count, modified_before.isoformat())
+            logger.info("%s modified before %s.", base_message, total_item_count, modified_before.isoformat())
         else:
-            logger.info("Finished bulk import of %i files.", file_count)
+            logger.info("%s.", base_message, total_item_count)
 
 
 def log_bulk_import_start(logger: Logger, modified_after: Optional[datetime], modified_before: Optional[datetime]):
