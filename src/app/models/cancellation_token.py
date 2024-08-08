@@ -33,3 +33,9 @@ class CancellationToken(CT):
                 logger.log(log_level, log_message, *log_message_args)
             raise OperationCanceledError(exception_message or "")
         return False
+
+
+__all__ = [
+    CancellationToken.__name__,
+    OperationCanceledError.__name__,
+]
