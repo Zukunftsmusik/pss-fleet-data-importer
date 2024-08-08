@@ -21,9 +21,9 @@ check:
 
 .PHONY: format
 format:
-	autoflake .
-	isort .
-	black .
+	autoflake ./src ./tests
+	isort ./src ./tests
+	black ./src ./tests
 
 # testing
 .PHONY: coverage
