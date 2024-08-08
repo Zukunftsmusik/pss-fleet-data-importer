@@ -464,7 +464,6 @@ def download_gdrive_file(
             return None
 
         log_waiting = True
-        wait_count = 0
         if not queue_item.error_while_downloading:
             while not check_if_exists(queue_item, check_path=queue_item.download_file_path):
                 if queue_item.cancel_token.cancelled:
@@ -474,15 +473,8 @@ def download_gdrive_file(
                 if log_waiting:
                     logger.debug("Waiting for file no. %i to complete disk write: %s", queue_item.item_no, queue_item.target_file_path)
                     log_waiting = False
-                wait_count += 1
-                if wait_count % 600 == 0:
-                    logger.debug(
-                        "Waiting for file no. %i to complete disk write for about %i minutes: %s",
-                        queue_item.item_no,
-                        wait_count // 60,
-                        queue_item.target_file_path,
-                    )
-                time.sleep(0.1)  # It may take some time for the file contents to be written to disk
+
+                time.sleep(0.1)  # It may take some time for the file contents to be flushed  to disk
 
         return queue_item
 
