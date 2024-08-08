@@ -466,7 +466,7 @@ def download_gdrive_file(
 
         return queue_item
 
-    raise DownloadFailedError(queue_item.gdrive_file_name, download_error.strerror)
+    raise DownloadFailedError(queue_item.gdrive_file_name, str(download_error))
 
 
 def check_if_exists(queue_item: CollectionFileQueueItem, check_path: Optional[Path] = None, logger: Optional[logging.Logger] = None):
