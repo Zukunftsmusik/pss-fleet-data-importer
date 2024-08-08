@@ -426,13 +426,7 @@ def download_gdrive_file(
             logger.debug("Cancelled download of file no. %i: %s", queue_item.item_no, queue_item.gdrive_file_name)
             return None
 
-        if attempt > 0:
-            logger.warn("Attempt %i at downloading file no. %i: %s", attempt + 1, queue_item.item_no, queue_item.gdrive_file_name)
-            if queue_item.download_file_path:
-                queue_item.download_file_path.unlink(missing_ok=True)
-                queue_item.download_file_path = None
-        else:
-            logger.debug("Downloading file no. %i: %s", queue_item.item_no, queue_item.gdrive_file_name)
+        log_gdrive_file_download(logger, attempt)
 
         if check_if_exists(queue_item, check_path=queue_item.target_file_path):
             queue_item.download_file_path = queue_item.target_file_path
@@ -453,6 +447,7 @@ def download_gdrive_file(
 
                 logger.debug("File no. %i downloaded: %s", queue_item.item_no, queue_item.target_file_path)
             except (pydrive2.files.ApiRequestError, pydrive2.files.FileNotDownloadableError) as download_error:
+                queue_item.download_file_path.unlink(missing_ok=True)
                 queue_item.download_file_path = None
                 queue_item.error_while_downloading = True
 
@@ -465,18 +460,12 @@ def download_gdrive_file(
             logger.debug("Cancelled download of file no. %i: %s", queue_item.item_no, queue_item.gdrive_file_name)
             return None
 
-        log_waiting = True
-        if not queue_item.error_while_downloading:
-            while not check_if_exists(queue_item, check_path=queue_item.download_file_path):
-                if queue_item.cancel_token.cancelled:
-                    logger.debug("Cancelled download of file no. %i: %s", queue_item.item_no, queue_item.gdrive_file_name)
-                    return None
+        while not queue_item.error_while_downloading and not check_if_exists(queue_item, check_path=queue_item.download_file_path):
+            if queue_item.cancel_token.cancelled:
+                logger.debug("Cancelled download of file no. %i: %s", queue_item.item_no, queue_item.gdrive_file_name)
+                return None
 
-                if log_waiting:
-                    logger.debug("Waiting for file no. %i to complete disk write: %s", queue_item.item_no, queue_item.target_file_path)
-                    log_waiting = False
-
-                time.sleep(0.1)  # It may take some time for the file contents to be flushed  to disk
+            time.sleep(0.1)  # It may take some time for the file contents to be flushed  to disk
 
         return queue_item
 
@@ -650,3 +639,10 @@ def log_worker_ended(logger: logging.Logger, worker_name: str, cancel_token: Can
         logger.info("%s cancelled.", worker_name.strip())
     else:
         logger.info("%s finished.", worker_name.strip())
+
+
+def log_gdrive_file_download(logger: logging.Logger, attempt: int, queue_item: CollectionFileQueueItem):
+    if attempt > 0:
+        logger.warn("Attempt %i at downloading file no. %i: %s", attempt + 1, queue_item.item_no, queue_item.gdrive_file_name)
+    else:
+        logger.debug("Downloading file no. %i: %s", queue_item.item_no, queue_item.gdrive_file_name)
