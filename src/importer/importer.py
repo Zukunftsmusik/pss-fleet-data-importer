@@ -324,8 +324,8 @@ def worker_download(
         executor.shutdown(cancel_futures=True)
         parent_logger.info("Download worker cancelled.")
     else:
-        parent_logger.info("Download worker finished.")
         executor.shutdown()
+        parent_logger.info("Download worker finished.")
 
     database_queue.put((None, None))
     import_queue.put(None)
