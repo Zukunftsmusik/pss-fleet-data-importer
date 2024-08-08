@@ -1,24 +1,24 @@
 import asyncio
 import json
+import logging
 import queue
 import random
 import threading
 import time
 from concurrent.futures import CancelledError, Future, ThreadPoolExecutor
 from datetime import datetime, timedelta, timezone
-from logging import Logger
 from pathlib import Path
 from typing import Iterable, Optional, Union
 
 import pydrive2.files
 from cancel_token import CancellationToken
 from pss_fleet_data import PssFleetDataClient
-from pss_fleet_data.core.exceptions import NonUniqueTimestampError
+from pss_fleet_data.core.exceptions import ApiError, NonUniqueTimestampError
 from pydrive2.files import ApiRequestError, GoogleDriveFile
 
 from .core import utils, wrapper
 from .core.config import Config
-from .core.gdrive import GoogleDriveClient, GoogleDriveFile
+from .core.gdrive import GoogleDriveClient
 from .database import AsyncAutoRollbackSession, Database, crud
 from .models import CollectionFileChange, CollectionFileQueueItem, ImportStatus, StatusFlag
 from .models.converters import FromCollectionFileDB, FromGdriveFile
@@ -40,7 +40,7 @@ class Importer:
 
         self.api_server_url: str = api_server_url or self.__config.api_default_server_url
         self.gdrive_folder_id: str = gdrive_folder_id or self.__config.gdrive_folder_id
-        self.logger: Logger = self.__config.logger.getChild(Importer.__name__)
+        self.logger: logging.Logger = self.__config.logger.getChild(Importer.__name__)
         self.status = ImportStatus()
         self.thread_pool_size: int = download_thread_pool_size
         self.temp_download_folder: Path = temp_download_folder or self.__config.temp_download_folder
@@ -188,14 +188,14 @@ class Importer:
 
         end = utils.get_now()
         log_bulk_import_finish(self.logger, queue_items, modified_after, modified_before)
-        print(f"### Finished bulk import of {len(queue_items)} files at: {end.isoformat()} (after: {end-start})")
+        print(f"### Finished bulk import of {len(queue_items)} files at: {end.isoformat()} (after: {end - start})")
 
         return True
 
 
 def get_gdrive_file_list(
     gdrive_client: GoogleDriveClient,
-    logger: Logger,
+    logger: logging.Logger,
     modified_after: Optional[datetime] = None,
     modified_before: Optional[datetime] = None,
 ) -> list[GoogleDriveFile]:
@@ -212,7 +212,7 @@ def get_gdrive_file_list(
 async def worker_db(
     database: Database,
     database_queue: queue.Queue,
-    parent_logger: Logger,
+    parent_logger: logging.Logger,
     status_flag: StatusFlag,
     cancel_token: CancellationToken,
     exit_after_none_count: int,
@@ -258,7 +258,7 @@ def worker_download(
     thread_pool_size: int,
     database_queue: queue.Queue,
     import_queue: queue.Queue,
-    parent_logger: Logger,
+    parent_logger: logging.Logger,
     status_flag: StatusFlag,
     worker_timed_out_flag: StatusFlag,
     cancel_token: CancellationToken,
@@ -337,7 +337,7 @@ async def worker_import(
     api_key: str,
     fleet_data_client: PssFleetDataClient,
     status_flag: StatusFlag,
-    parent_logger: Logger,
+    parent_logger: logging.Logger,
     cancel_token: CancellationToken,
     exit_after_none_count: int,
     keep_downloaded_files: bool = False,
@@ -372,47 +372,49 @@ async def worker_import(
         logger.debug("Importing file no. %i: %s", queue_item.item_no, queue_item.download_file_path)
 
         try:
-            collection_metadata = await fleet_data_client.upload_collection(str(queue_item.download_file_path), api_key=api_key)
-            imported_at = utils.remove_timezone(datetime.now(tz=timezone.utc))
-            logger.info(
-                "Imported file no. %i (Collection ID: %i): %s", queue_item.item_no, collection_metadata.collection_id, queue_item.download_file_path
-            )
-        except NonUniqueTimestampError:
-            imported_at = utils.remove_timezone(datetime.now(tz=timezone.utc))
-            collection_metadata = await fleet_data_client.get_most_recent_collection_metadata_by_timestamp(queue_item.collection_file.timestamp)
-            logger.info(
-                "Skipped file no. %i (Collection already exists with ID: %i): %s",
-                queue_item.item_no,
-                collection_metadata.collection_id,
-                queue_item.download_file_path,
-            )
-        except Exception as exc:
+            imported_at = await import_file(fleet_data_client, queue_item, api_key, logger)
+        except ApiError as exc:
             logger.error("Could not import file no. %i: %s", queue_item.item_no, queue_item.gdrive_file_name)
             logger.error(exc, exc_info=True)
-            import_queue.task_done()
             continue
 
-        if collection_metadata:
-            database_queue.put((queue_item, CollectionFileChange(imported_at=imported_at)))
+        database_queue.put((queue_item, CollectionFileChange(imported_at=imported_at)))
 
-            if not keep_downloaded_files:
-                queue_item.download_file_path.unlink(missing_ok=True)
+        if not keep_downloaded_files:
+            queue_item.download_file_path.unlink(missing_ok=True)
 
         import_queue.task_done()
 
-    if cancel_token.cancelled:
-        parent_logger.info("Import worker cancelled.")
-    else:
-        parent_logger.info("Import worker finished.")
+    log_worker_ended(parent_logger, "Import worker", cancel_token)
 
     database_queue.put((None, None))
     status_flag.value = False
 
 
+async def import_file(fleet_data_client: PssFleetDataClient, queue_item: CollectionFileQueueItem, api_key: str, logger: logging.Logger) -> datetime:
+    try:
+        collection_metadata = await fleet_data_client.upload_collection(str(queue_item.download_file_path), api_key=api_key)
+        imported_at = utils.remove_timezone(datetime.now(tz=timezone.utc))
+        logger.info(
+            "Imported file no. %i (Collection ID: %i): %s", queue_item.item_no, collection_metadata.collection_id, queue_item.download_file_path
+        )
+    except NonUniqueTimestampError:
+        imported_at = utils.remove_timezone(datetime.now(tz=timezone.utc))
+        collection_metadata = await fleet_data_client.get_most_recent_collection_metadata_by_timestamp(queue_item.collection_file.timestamp)
+        logger.info(
+            "Skipped file no. %i (Collection already exists with ID: %i): %s",
+            queue_item.item_no,
+            collection_metadata.collection_id,
+            queue_item.download_file_path,
+        )
+
+    return imported_at
+
+
 def download_gdrive_file(
     queue_item: CollectionFileQueueItem,
     gdrive_client: GoogleDriveClient,
-    parent_logger: Logger,
+    parent_logger: logging.Logger,
     debug_mode: bool,
     max_attempts: int = 5,
 ) -> Optional[CollectionFileQueueItem]:
@@ -481,7 +483,7 @@ def download_gdrive_file(
     raise DownloadFailedError(queue_item.gdrive_file_name, download_error.strerror)
 
 
-def check_if_exists(queue_item: CollectionFileQueueItem, check_path: Optional[Path] = None, logger: Optional[Logger] = None):
+def check_if_exists(queue_item: CollectionFileQueueItem, check_path: Optional[Path] = None, logger: Optional[logging.Logger] = None):
     check_path = check_path or queue_item.target_file_path
     if logger:
         logger.debug("Checking if file no. %i exists at: %s", queue_item.item_no, check_path)
@@ -509,7 +511,7 @@ def check_if_exists(queue_item: CollectionFileQueueItem, check_path: Optional[Pa
     return False
 
 
-async def check_if_file_empty(logger: Logger, file_no: int, queue_item: CollectionFileQueueItem, read_tries: Optional[int] = 5) -> bool:
+async def check_if_file_empty(logger: logging.Logger, file_no: int, queue_item: CollectionFileQueueItem, read_tries: Optional[int] = 5) -> bool:
     if read_tries is None:
         read_tries = 5
 
@@ -552,7 +554,7 @@ def create_queues(queue_items: list[CollectionFileQueueItem]) -> tuple[list[tupl
 
 
 def log_bulk_import_finish(
-    logger: Logger, queue_items: list[CollectionFileQueueItem], modified_after: Optional[datetime], modified_before: Optional[datetime]
+    logger: logging.Logger, queue_items: list[CollectionFileQueueItem], modified_after: Optional[datetime], modified_before: Optional[datetime]
 ):
     total_item_count = len(queue_items)
     downloaded_item_count = len([queue_item for queue_item in queue_items if queue_item.collection_file.downloaded_at])
@@ -578,7 +580,7 @@ def log_bulk_import_finish(
             logger.info("%s.", base_message, total_item_count)
 
 
-def log_bulk_import_start(logger: Logger, modified_after: Optional[datetime], modified_before: Optional[datetime]):
+def log_bulk_import_start(logger: logging.Logger, modified_after: Optional[datetime], modified_before: Optional[datetime]):
     if modified_after:
         if modified_before:
             logger.info(
@@ -593,13 +595,13 @@ def log_bulk_import_start(logger: Logger, modified_after: Optional[datetime], mo
             logger.info("Starting bulk import.")
 
 
-def log_downloads_imports(logger: Logger, queue_items: list[CollectionFileQueueItem]):
+def log_downloads_imports(logger: logging.Logger, queue_items: list[CollectionFileQueueItem]):
     download_count = len([_ for _ in queue_items if _.collection_file.downloaded_at is None])
     import_count = len([_ for _ in queue_items if _.collection_file.imported_at is None])
     logger.info(f"Downloading {download_count} Collection files and importing {import_count} Collection files.")
 
 
-def log_get_gdrive_file_list_params(logger: Logger, modified_after: Optional[datetime], modified_before: Optional[datetime]):
+def log_get_gdrive_file_list_params(logger: logging.Logger, modified_after: Optional[datetime], modified_before: Optional[datetime]):
     if modified_after or modified_before:
         if modified_after:
             if modified_before:
@@ -614,7 +616,7 @@ def log_get_gdrive_file_list_params(logger: Logger, modified_after: Optional[dat
         logger.info("Retrieving all gdrive files.")
 
 
-def log_download_error(logger: Logger, queue_item: CollectionFileQueueItem, log_exception: bool, exc: ApiRequestError, sleep_for: timedelta):
+def log_download_error(logger: logging.Logger, queue_item: CollectionFileQueueItem, log_exception: bool, exc: ApiRequestError, sleep_for: timedelta):
     msg = f"An error occured while downloading the file no. {queue_item.item_no} '{queue_item.gdrive_file_name}' from Drive. Retrying in {sleep_for.total_seconds():.2f} seconds."
     if log_exception:
         logger.error(msg, exc_info=exc)
@@ -622,7 +624,7 @@ def log_download_error(logger: Logger, queue_item: CollectionFileQueueItem, log_
         logger.error("%s:  %s", msg, type(exc))
 
 
-async def skip_file_import_on_error(logger: Logger, file_no: int, queue_item: CollectionFileQueueItem) -> bool:
+async def skip_file_import_on_error(logger: logging.Logger, file_no: int, queue_item: CollectionFileQueueItem) -> bool:
     if queue_item.cancel_token.cancelled:
         return True
 
@@ -639,5 +641,12 @@ async def skip_file_import_on_error(logger: Logger, file_no: int, queue_item: Co
     return False
 
 
-def log_queue_item_update(logger: Logger, queue_item: CollectionFileQueueItem, change: CollectionFileChange):
+def log_queue_item_update(logger: logging.Logger, queue_item: CollectionFileQueueItem, change: CollectionFileChange):
     logger.debug("Updated queue item no. %i: %s", queue_item.item_no, change)
+
+
+def log_worker_ended(logger: logging.Logger, worker_name: str, cancel_token: CancellationToken = None):
+    if cancel_token and cancel_token.cancelled:
+        logger.info("%s cancelled.", worker_name.strip())
+    else:
+        logger.info("%s finished.", worker_name.strip())
