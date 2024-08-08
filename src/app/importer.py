@@ -306,7 +306,7 @@ def worker_download(
             executor.shutdown(False, cancel_futures=True)
             continue
         except Exception as exc:
-            logger.warn("Future no. %i raised an error: %s", i, type(exc))
+            logger.warn("Future no. %i raised an error: %s", i, exc)
             continue
 
         if queue_item:  # If the operation was cancelled, None is returned
