@@ -49,6 +49,7 @@ test_cases_valid = [
 @pytest.mark.parametrize(["exception_type"], test_cases_do_not_log_exception)
 def test_get_file_contents_do_not_log_exception(
     exception_type: type[Exception],
+    logger: logging.Logger,
     monkeypatch: pytest.MonkeyPatch,
     caplog: pytest.LogCaptureFixture,
 ):
@@ -61,7 +62,7 @@ def test_get_file_contents_do_not_log_exception(
 
     with caplog.at_level(logging.WARNING):
         with pytest.raises(exception_type):
-            _ = get_file_contents(file, logging.getLogger())
+            _ = get_file_contents(file, logger)
 
     assert "An error occured while downloading file" not in caplog.text
 
@@ -70,6 +71,7 @@ def test_get_file_contents_do_not_log_exception(
 def test_get_file_contents_log_exception(
     exception_type: type[Exception],
     exception_instance: Exception,
+    logger: logging.Logger,
     monkeypatch: pytest.MonkeyPatch,
     caplog: pytest.LogCaptureFixture,
 ):
@@ -83,19 +85,23 @@ def test_get_file_contents_log_exception(
 
     with caplog.at_level(logging.WARNING):
         with pytest.raises(exception_type):
-            _ = get_file_contents(file, logging.getLogger())
+            _ = get_file_contents(file, logger)
 
     assert file_name in caplog.text
     assert "An error occured while downloading file" in caplog.text
 
 
 @pytest.mark.parametrize(["content"], test_cases_valid)
-def test_get_file_contents_valid(content: Optional[str], monkeypatch: pytest.MonkeyPatch):
+def test_get_file_contents_valid(
+    content: Optional[str],
+    logger: logging.Logger,
+    monkeypatch: pytest.MonkeyPatch,
+):
     def mock_GetContentString(*args):
         return content
 
     monkeypatch.setattr(pydrive2.files.GoogleDriveFile, pydrive2.files.GoogleDriveFile.GetContentString.__name__, mock_GetContentString)
 
     file: pydrive2.files.GoogleDriveFile = pydrive2.files.GoogleDriveFile(None)
-    result = get_file_contents(file, logging.getLogger())
+    result = get_file_contents(file, logger)
     assert result == content
