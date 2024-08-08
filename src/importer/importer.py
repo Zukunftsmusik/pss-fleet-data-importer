@@ -421,8 +421,6 @@ def download_gdrive_file(
             queue_item.target_file_path.unlink(missing_ok=True)  # File also counts as not existing, if the file size differs from the file on gdrive
 
             try:
-                # TODO: If file.GetContentFile doesn't work, try file.GetContentString instead and save to disk manually.
-
                 file_contents = gdrive_client.get_file_contents(queue_item.gdrive_file)
                 if file_contents:
                     with open(queue_item.target_file_path, "w") as fp:
