@@ -32,6 +32,7 @@ class ImportStatus:
         self.bulk_import_running = StatusFlag("bulk_import_running", False)
         self.bulk_database_running = StatusFlag("bulk_database_running", False)
         self.cancel_token: CancellationToken = CancellationToken()
+        self.download_worker_timed_out = StatusFlag("download_worker_timed_out", False)
 
     @property
     def cancelled(self) -> bool:
