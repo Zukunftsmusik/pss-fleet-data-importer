@@ -19,7 +19,7 @@ from .core import utils, wrapper
 from .core.config import Config
 from .core.gdrive import GoogleDriveClient
 from .database import AsyncAutoRollbackSession, Database, crud
-from .models.cancellation_token import CancellationToken
+from .models.cancellation_token import CancellationToken, OperationCanceledError
 from .models.collection_file_change import CollectionFileChange
 from .models.converters import FromCollectionFileDB, FromGdriveFile
 from .models.exceptions import DownloadFailedError
@@ -277,30 +277,20 @@ def worker_download(
     logger.debug("Setting up thread pool for downloads with %i workers.", thread_pool_size)
     executor = ThreadPoolExecutor(thread_pool_size, thread_name_prefix="Download gdrive file")
     for queue_item in queue_items:
-        if cancel_token.cancelled:
-            logger.warn("Requested cancellation during thread pool setup.")
+        if cancel_token.log_if_cancelled(logger, "Requested cancellation during thread pool setup."):
             break
 
         futures.append(executor.submit(download_gdrive_file, queue_item, gdrive_client, logger, debug_mode, max_attempts=1))
 
-    log_cancellation = True
     for i, future in enumerate(futures, 1):
         if cancel_token.cancelled:
-            if log_cancellation:
-                logger.warn("Requested cancellation at queue item no.: %i", i)
-                log_cancellation = False
-
             if not future.done():
                 future.cancel()
-
-            break
-
-        if future.cancelled():
             continue
 
         try:
             queue_item: CollectionFileQueueItem = future.result(60)
-        except CancelledError:
+        except (CancelledError, OperationCanceledError):
             continue
         except TimeoutError:
             worker_timed_out_flag.value = True
@@ -424,9 +414,9 @@ def download_gdrive_file(
     download_error: Union[pydrive2.files.ApiRequestError, pydrive2.files.FileNotDownloadableError] = None
 
     for attempt in range(max_attempts):
-        if queue_item.cancel_token.cancelled:
-            logger.debug("Cancelled download of file no. %i: %s", queue_item.item_no, queue_item.gdrive_file_name)
-            return None
+        queue_item.cancel_token.raise_if_cancelled(
+            logger, "Cancelled download of file no. %i: %s", queue_item.item_no, queue_item.gdrive_file_name, log_level=logging.DEBUG
+        )
 
         log_gdrive_file_download(logger, attempt)
 
@@ -439,6 +429,11 @@ def download_gdrive_file(
 
             try:
                 file_contents = gdrive_client.get_file_contents(queue_item.gdrive_file)
+
+                queue_item.cancel_token.raise_if_cancelled(
+                    logger, "Cancelled download of file no. %i: %s", queue_item.item_no, queue_item.gdrive_file_name, log_level=logging.DEBUG
+                )
+
                 if file_contents:
                     with open(queue_item.target_file_path, "w") as fp:
                         fp.write(file_contents)
@@ -458,14 +453,14 @@ def download_gdrive_file(
                 time.sleep(sleep_for.total_seconds())  # Wait for a increasing time before retrying
                 continue
 
-        if queue_item.cancel_token.cancelled:
-            logger.debug("Cancelled download of file no. %i: %s", queue_item.item_no, queue_item.gdrive_file_name)
-            return None
+        queue_item.cancel_token.raise_if_cancelled(
+            logger, "Cancelled download of file no. %i: %s", queue_item.item_no, queue_item.gdrive_file_name, log_level=logging.DEBUG
+        )
 
         while not queue_item.error_while_downloading and not check_if_exists(queue_item, check_path=queue_item.download_file_path):
-            if queue_item.cancel_token.cancelled:
-                logger.debug("Cancelled download of file no. %i: %s", queue_item.item_no, queue_item.gdrive_file_name)
-                return None
+            queue_item.cancel_token.raise_if_cancelled(
+                logger, "Cancelled download of file no. %i: %s", queue_item.item_no, queue_item.gdrive_file_name, log_level=logging.DEBUG
+            )
 
             time.sleep(0.1)  # It may take some time for the file contents to be flushed  to disk
 
