@@ -11,7 +11,6 @@ from pathlib import Path
 from typing import Iterable, Optional, Union
 
 import pydrive2.files
-from cancel_token import CancellationToken
 from pss_fleet_data import PssFleetDataClient
 from pss_fleet_data.core.exceptions import ApiError, NonUniqueTimestampError
 from pydrive2.files import ApiRequestError, GoogleDriveFile
@@ -20,9 +19,12 @@ from .core import utils, wrapper
 from .core.config import Config
 from .core.gdrive import GoogleDriveClient
 from .database import AsyncAutoRollbackSession, Database, crud
-from .models import CollectionFileChange, CollectionFileQueueItem, ImportStatus, StatusFlag
+from .models.cancellation_token import CancellationToken
+from .models.collection_file_change import CollectionFileChange
 from .models.converters import FromCollectionFileDB, FromGdriveFile
 from .models.exceptions import DownloadFailedError
+from .models.queue_item import CollectionFileQueueItem
+from .models.status import ImportStatus, StatusFlag
 
 
 class Importer:

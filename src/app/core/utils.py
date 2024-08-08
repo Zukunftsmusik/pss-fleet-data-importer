@@ -5,9 +5,9 @@ from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any, Awaitable, Callable, Iterable, Mapping, Optional, Union
 
-from cancel_token import CancellationToken
 from pydrive2.files import GoogleDriveFile
 
+from ..models.cancellation_token import CancellationToken
 from ..models.status import StatusFlag
 
 

@@ -3,11 +3,11 @@ from typing import Iterable
 
 import dateutil
 import dateutil.parser
-from cancel_token import CancellationToken
 from pydrive2.files import GoogleDriveFile
 
 from ..core import utils
 from ..database.models import CollectionFileDB
+from .cancellation_token import CancellationToken
 from .queue_item import CollectionFileQueueItem
 
 

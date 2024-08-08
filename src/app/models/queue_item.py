@@ -4,13 +4,13 @@ from threading import Lock
 
 import dateutil
 import dateutil.parser
-from cancel_token import CancellationToken
 from pydrive2.files import GoogleDriveFile
 
 from ..core import utils
 from ..database import crud
 from ..database.db import AsyncAutoRollbackSession, Database
 from ..database.models import CollectionFileDB
+from .cancellation_token import CancellationToken
 from .collection_file_change import CollectionFileChange
 
 
