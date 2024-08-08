@@ -132,53 +132,60 @@ class Importer:
 
         log_downloads_imports(self.logger, queue_items)
 
-        download_thread = threading.Thread(
-            target=worker_download,
-            args=[
-                queue_items,
-                self.__gdrive_client,
-                self.thread_pool_size,
-                self.__database_queue,
-                self.__import_queue,
-                self.logger,
-                self.status.bulk_download_running,
-                self.status.cancel_token,
-                self.__config.debug_mode,
-            ],
-            daemon=True,
-        )
-        download_thread.start()
+        worker_threads = [
+            threading.Thread(
+                target=worker_download,
+                name="Download worker",
+                args=[
+                    queue_items,
+                    self.__gdrive_client,
+                    self.thread_pool_size,
+                    self.__database_queue,
+                    self.__import_queue,
+                    self.logger,
+                    self.status.bulk_download_running,
+                    self.status.download_worker_timed_out,
+                    self.status.cancel_token,
+                    self.__config.debug_mode,
+                ],
+                daemon=True,
+            ),
+            utils.create_async_thread(
+                worker_import,
+                name="Import worker",
+                args=(
+                    self.__import_queue,
+                    self.__database_queue,
+                    self.__api_key,
+                    self.__fleet_data_client,
+                    self.status.bulk_import_running,
+                    self.logger,
+                    self.status.cancel_token,
+                    1,
+                    self.__config.keep_downloaded_files,
+                ),
+                daemon=True,
+            ),
+            utils.create_async_thread(
+                worker_db,
+                name="Database worker",
+                args=(
+                    self.__database,
+                    self.__database_queue,
+                    self.logger,
+                    self.status.bulk_database_running,
+                    self.status.cancel_token,
+                    2,
+                ),
+                daemon=True,
+            ),
+        ]
 
-        import_thread = utils.create_async_thread(
-            worker_import,
-            self.__import_queue,
-            self.__database_queue,
-            self.__api_key,
-            self.__fleet_data_client,
-            self.status.bulk_import_running,
-            self.logger,
-            self.status.cancel_token,
-            [self.status.bulk_download_running],
-            self.__config.keep_downloaded_files,
-            daemon=True,
-        )
-        import_thread.start()
+        for thread in worker_threads:
+            thread.start()
 
-        database_thread = utils.create_async_thread(
-            worker_db,
-            self.__database,
-            self.__database_queue,
-            self.logger,
-            self.status.bulk_database_running,
-            self.status.cancel_token,
-            [self.status.bulk_download_running, self.status.bulk_import_running],
-            daemon=True,
-        )
-        database_thread.start()
-
-        download_thread.join()
-        import_thread.join()
-        database_thread.join()
+        for thread in worker_threads:
+            thread.join()
 
         log_bulk_import_finish(self.logger, len(queue_items), modified_after, modified_before)
         end = utils.get_now()
@@ -209,7 +216,7 @@ async def worker_db(
     parent_logger: Logger,
     status_flag: StatusFlag,
     cancel_token: CancellationToken,
-    watch_flags: list[StatusFlag],
+    exit_after_none_count: int,
 ):
     status_flag.value = True
     parent_logger.info("Database worker started...")
@@ -217,15 +224,22 @@ async def worker_db(
 
     queue_item: CollectionFileQueueItem
     change: CollectionFileChange
+    none_count = 0
 
     while not cancel_token.cancelled:
         try:
             queue_item, change = database_queue.get(block=False)
         except queue.Empty:
-            if any(watch_flags):
-                await asyncio.sleep(0.1)
+            await asyncio.sleep(0.1)
+            continue
+
+        if queue_item is None and change is None:
+            none_count += 1
+
+            if none_count == exit_after_none_count:
+                break
+            else:
                 continue
-            break
 
         await queue_item.update_collection_file(database, change)
         log_queue_item_update(logger, queue_item, change)
@@ -247,18 +261,20 @@ def worker_download(
     import_queue: queue.Queue,
     parent_logger: Logger,
     status_flag: StatusFlag,
+    worker_timed_out_flag: StatusFlag,
     cancel_token: CancellationToken,
     debug_mode: bool,
 ):
     status_flag.value = True
+    worker_timed_out_flag.value = False
+
     parent_logger.info("Download worker started...")
     logger = parent_logger.getChild("downloadWorker")
 
-    timed_out = False
-
-    executor = ThreadPoolExecutor(thread_pool_size)
     futures: list[Future] = []
+
     logger.debug("Setting up thread pool for downloads with %i workers.", thread_pool_size)
+    executor = ThreadPoolExecutor(thread_pool_size, thread_name_prefix="Download gdrive file")
     for queue_item in queue_items:
         if cancel_token.cancelled:
             logger.warn("Requested cancellation during thread pool setup.")
@@ -286,10 +302,10 @@ def worker_download(
         except CancelledError:
             continue
         except TimeoutError:
-            future.set_exception(KeyboardInterrupt)
+            worker_timed_out_flag.value = True
             logger.warn("Future no. %i timed out.", i)
-            timed_out = True
-            break  # Using break here to exit the worker and subsequently make the bulk import restart.
+            executor.shutdown(False, cancel_futures=True)
+            continue
         except Exception as exc:
             logger.warn("Future no. %i raised an error: %s", i, type(exc))
             continue
@@ -307,11 +323,12 @@ def worker_download(
         logger.debug("Shutting down thread pool, waiting for running downloads to complete.")
         executor.shutdown(cancel_futures=True)
         parent_logger.info("Download worker cancelled.")
-    elif timed_out:
-        logger.warn("Download worker timed out.")
-        executor.shutdown(False, cancel_futures=True)
     else:
         parent_logger.info("Download worker finished.")
+        executor.shutdown()
+
+    database_queue.put((None, None))
+    import_queue.put(None)
     status_flag.value = False
 
 
@@ -323,28 +340,30 @@ async def worker_import(
     status_flag: StatusFlag,
     parent_logger: Logger,
     cancel_token: CancellationToken,
-    watch_flags: list[StatusFlag],
+    exit_after_none_count: int,
     keep_downloaded_files: bool = False,
 ):
     status_flag.value = True
     parent_logger.info("Import worker started...")
     logger = parent_logger.parent.getChild("importWorker")
 
-    log_queue_empty = True
     queue_item: CollectionFileQueueItem = None
+    none_count = 0
 
     while not cancel_token.cancelled:
         try:
             queue_item = import_queue.get(block=False)
         except queue.Empty:
-            if any(watch_flags):
-                if log_queue_empty and queue_item:
-                    logger.debug("Download worker is running, but queue is empty after item no. %i", queue_item.item_no)
-                    queue_item = None
-                    log_queue_empty = False
-                await asyncio.sleep(0.1)
+            await asyncio.sleep(0.1)
+            continue
+
+        if queue_item is None:
+            none_count += 1
+
+            if none_count == exit_after_none_count:
+                break
+            else:
                 continue
-            break
 
         if await skip_file_import_on_error(logger, queue_item.item_no, queue_item):
             logger.error("Could not import file no. %i: %s", queue_item.item_no, queue_item.gdrive_file_name)
@@ -381,13 +400,13 @@ async def worker_import(
                 queue_item.download_file_path.unlink(missing_ok=True)
 
         import_queue.task_done()
-        log_queue_empty = True
 
     if cancel_token.cancelled:
         parent_logger.info("Import worker cancelled.")
     else:
         parent_logger.info("Import worker finished.")
 
+    database_queue.put((None, None))
     status_flag.value = False
 
 

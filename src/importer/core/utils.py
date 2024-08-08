@@ -123,11 +123,14 @@ def start_pooled_bulk_operation(
 
 def create_async_thread(
     coro: Callable[..., Awaitable[Any]],
-    *args: Any,
     name: str = None,
+    args: Iterable[Any] = None,
+    kwargs: Mapping[str, Any] = None,
     daemon: bool = True,
-    **kwargs: Mapping[str, Any],
 ) -> threading.Thread:
+    args = args or ()
+    kwargs = kwargs or {}
+
     def target():
         asyncio.run(coro(*args, **kwargs))
 
