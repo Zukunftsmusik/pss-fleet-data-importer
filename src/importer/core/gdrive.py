@@ -53,21 +53,18 @@ class GoogleDriveClient:
     def logger(self) -> logging.Logger:
         return self.__logger
 
-    def download_file(self, file: pydrive2.files.GoogleDriveFile, target_dir: Path) -> Path:
+    def get_file_contents(self, file: pydrive2.files.GoogleDriveFile) -> str:
         file_name = utils.get_gdrive_file_name(file)
-        target_file_path = target_dir.joinpath(file_name)
 
         try:
-            self.logger.debug("Downloading file '%s' to: %s", file_name, target_file_path)
-            # time.sleep(10)
-            file.GetContentFile(target_file_path, mimetype="application/json")
-            self.logger.debug("Downloaded file '%s' to: %s", file_name, target_file_path)
+            self.logger.debug("Downloading file: %s", file_name)
+            result = file.GetContentString()
+            self.logger.debug("Downloaded file: %s", file_name)
         except (pydrive2.files.ApiRequestError, pydrive2.files.FileNotDownloadableError) as exc:
             self.logger.warn("An error occured while downloading file '%s': %s", file_name, exc)
-            target_file_path.unlink(missing_ok=True)
             raise exc
 
-        return target_file_path
+        return result
 
     def list_all_files(self) -> Generator[pydrive2.files.GoogleDriveFile, None, None]:
         self.__ensure_initialized()

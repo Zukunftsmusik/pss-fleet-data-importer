@@ -423,7 +423,7 @@ def download_gdrive_file(
             try:
                 # TODO: If file.GetContentFile doesn't work, try file.GetContentString instead and save to disk manually.
 
-                file_contents = gdrive_client.download_file(queue_item.gdrive_file, queue_item.target_directory_path)
+                file_contents = gdrive_client.get_file_contents(queue_item.gdrive_file)
                 if file_contents:
                     with open(queue_item.target_file_path, "w") as fp:
                         fp.write(file_contents)
