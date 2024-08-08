@@ -1,6 +1,8 @@
 from pathlib import Path
 from typing import Iterable
 
+import dateutil
+import dateutil.parser
 from cancel_token import CancellationToken
 from pydrive2.files import GoogleDriveFile
 
@@ -18,7 +20,7 @@ class FromGdriveFile:
         collection_file = CollectionFileDB(
             gdrive_file_id=gdrive_file["id"],
             file_name=file_name,
-            gdrive_modified_date=gdrive_file["modifiedDate"],
+            gdrive_modified_date=utils.remove_timezone(dateutil.parser.parse(gdrive_file["modifiedDate"])),
             timestamp=timestamp,
         )
         return collection_file
