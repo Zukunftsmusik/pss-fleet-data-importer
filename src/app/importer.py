@@ -425,9 +425,10 @@ def download_gdrive_file(
             return None
 
         if attempt > 0:
-            logger.warn("Attempt %i at downloading file no. %i: %s", attempt, queue_item.item_no, queue_item.gdrive_file_name)
-            queue_item.download_file_path.unlink(missing_ok=True)
-            queue_item.download_file_path = None
+            logger.warn("Attempt %i at downloading file no. %i: %s", attempt + 1, queue_item.item_no, queue_item.gdrive_file_name)
+            if queue_item.download_file_path:
+                queue_item.download_file_path.unlink(missing_ok=True)
+                queue_item.download_file_path = None
         else:
             logger.debug("Downloading file no. %i: %s", queue_item.item_no, queue_item.gdrive_file_name)
 
