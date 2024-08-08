@@ -280,7 +280,7 @@ def worker_download(
         if cancel_token.log_if_cancelled(logger, "Requested cancellation during thread pool setup."):
             break
 
-        futures.append(executor.submit(download_gdrive_file, queue_item, gdrive_client, logger, debug_mode, max_attempts=1))
+        futures.append(executor.submit(download_gdrive_file, queue_item, gdrive_client, logger, debug_mode, max_attempts=3))
 
     for i, future in enumerate(futures, 1):
         if cancel_token.cancelled:
