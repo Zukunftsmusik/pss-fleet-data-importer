@@ -48,6 +48,7 @@ class Importer:
         self.__database: Database = database
         self.__api_key: str = api_key or self.__config.api_key
 
+        self.__download_queue: list[CollectionFileQueueItem] = []
         self.__import_queue: queue.Queue = queue.Queue()
         self.__database_queue: queue.Queue = queue.Queue()
 
@@ -82,12 +83,16 @@ class Importer:
             after = modified_after
             if not modified_after:
                 async with AsyncAutoRollbackSession(self.__database) as session:
+                    # Check DB for collection_file with earliest modified_date that wasn't imported, yet.
+                    # crud.get_collection_files(imported=False)
+                    # get min(collection_file.modified_date)
                     last_imported_file = await crud.get_latest_imported_collection_file(session)
                     after = utils.get_next_full_hour(last_imported_file.timestamp) if last_imported_file else None
 
             did_import = await self.run_bulk_import(modified_after=after, modified_before=modified_before)
 
             if did_import:
+
                 continue
 
             now = utils.get_now()
@@ -112,9 +117,10 @@ class Importer:
 
         self.logger.info(f"Found {len(gdrive_files)} new gdrive files to be imported.")
 
-        self.logger.debug("Creating database entries.")
         collection_files = [FromGdriveFile.to_collection_file(gdrive_file) for gdrive_file in gdrive_files]
         collection_files.sort(key=lambda file: file.file_name.replace("-", "_"))  # There're files where some underscores are hyphens.
+
+        self.logger.debug("Creating database entries.")
         async with AsyncAutoRollbackSession(self.__database) as session:
             collection_files = await crud.insert_new_collection_files(session, collection_files)
 
@@ -156,7 +162,7 @@ class Importer:
             self.__config.keep_downloaded_files,
             daemon=True,
         )
-        # import_thread.start()
+        import_thread.start()
 
         database_thread = utils.create_async_thread(
             worker_db,
@@ -171,7 +177,7 @@ class Importer:
         database_thread.start()
 
         download_thread.join()
-        # import_thread.join()
+        import_thread.join()
         database_thread.join()
 
         log_bulk_import_finish(self.logger, len(queue_items), modified_after, modified_before)
@@ -248,7 +254,9 @@ def worker_download(
     parent_logger.info("Download worker started...")
     logger = parent_logger.getChild("downloadWorker")
 
-    executor = ThreadPoolExecutor(2 or thread_pool_size)  # TODO: Remove 1 before deploying :D
+    timed_out = False
+
+    executor = ThreadPoolExecutor(thread_pool_size)
     futures: list[Future] = []
     logger.debug("Setting up thread pool for downloads with %i workers.", thread_pool_size)
     for queue_item in queue_items:
@@ -268,22 +276,20 @@ def worker_download(
             if not future.done():
                 future.cancel()
 
-            logger.debug("Shutting down thread pool, waiting for running downloads to complete.")
-            executor.shutdown(cancel_futures=True)
             break
 
         if future.cancelled():
             continue
 
         try:
-            queue_item: CollectionFileQueueItem = future.result(3)
+            queue_item: CollectionFileQueueItem = future.result(60)
         except CancelledError:
             continue
         except TimeoutError:
             future.set_exception(KeyboardInterrupt)
             logger.warn("Future no. %i timed out.", i)
-            cancel_token.cancel()
-            continue  # Using break here to exit the worker and subsequently make the bulk import restart.
+            timed_out = True
+            break  # Using break here to exit the worker and subsequently make the bulk import restart.
         except Exception as exc:
             logger.warn("Future no. %i raised an error: %s", i, type(exc))
             continue
@@ -298,7 +304,12 @@ def worker_download(
             import_queue.put(queue_item)
 
     if cancel_token.cancelled:
+        logger.debug("Shutting down thread pool, waiting for running downloads to complete.")
+        executor.shutdown(cancel_futures=True)
         parent_logger.info("Download worker cancelled.")
+    elif timed_out:
+        logger.warn("Download worker timed out.")
+        executor.shutdown(False, cancel_futures=True)
     else:
         parent_logger.info("Download worker finished.")
     status_flag.value = False
@@ -336,29 +347,29 @@ async def worker_import(
             break
 
         if await skip_file_import_on_error(logger, queue_item.item_no, queue_item):
-            logger.error("Could not import file %i: %s", queue_item.item_no, queue_item.gdrive_file_name)
+            logger.error("Could not import file no. %i: %s", queue_item.item_no, queue_item.gdrive_file_name)
             import_queue.task_done()
             continue
 
-        logger.debug("Importing file %i: %s", queue_item.item_no, queue_item.download_file_path)
+        logger.debug("Importing file no. %i: %s", queue_item.item_no, queue_item.download_file_path)
 
         try:
             collection_metadata = await fleet_data_client.upload_collection(str(queue_item.download_file_path), api_key=api_key)
             imported_at = utils.remove_timezone(datetime.now(tz=timezone.utc))
             logger.info(
-                "Imported file %i (Collection ID: %i): %s", queue_item.item_no, collection_metadata.collection_id, queue_item.download_file_path
+                "Imported file no. %i (Collection ID: %i): %s", queue_item.item_no, collection_metadata.collection_id, queue_item.download_file_path
             )
         except NonUniqueTimestampError:
             imported_at = utils.remove_timezone(datetime.now(tz=timezone.utc))
             collection_metadata = await fleet_data_client.get_most_recent_collection_metadata_by_timestamp(queue_item.collection_file.timestamp)
             logger.info(
-                "Skipped file %i (Collection already exists with ID: %i): %s",
+                "Skipped file no. %i (Collection already exists with ID: %i): %s",
                 queue_item.item_no,
                 collection_metadata.collection_id,
                 queue_item.download_file_path,
             )
         except Exception as exc:
-            logger.error("Could not import file %i: %s", queue_item.item_no, queue_item.gdrive_file_name)
+            logger.error("Could not import file no. %i: %s", queue_item.item_no, queue_item.gdrive_file_name)
             logger.error(exc, exc_info=True)
             import_queue.task_done()
             continue
@@ -412,8 +423,14 @@ def download_gdrive_file(
             try:
                 # TODO: If file.GetContentFile doesn't work, try file.GetContentString instead and save to disk manually.
 
-                queue_item.download_file_path = gdrive_client.download_file(queue_item.gdrive_file, queue_item.target_directory_path)
-                queue_item.error_while_downloading = False
+                file_contents = gdrive_client.download_file(queue_item.gdrive_file, queue_item.target_directory_path)
+                if file_contents:
+                    with open(queue_item.target_file_path, "w") as fp:
+                        fp.write(file_contents)
+                    queue_item.error_while_downloading = False
+                    queue_item.download_file_path = queue_item.target_file_path
+                else:
+                    queue_item.error_while_downloading = True
 
                 logger.debug("File no. %i downloaded: %s", queue_item.item_no, queue_item.target_file_path)
             except (pydrive2.files.ApiRequestError, pydrive2.files.FileNotDownloadableError) as download_error:
