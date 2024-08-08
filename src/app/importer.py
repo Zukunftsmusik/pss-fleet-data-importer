@@ -272,43 +272,12 @@ def worker_download(
     parent_logger.info("Download worker started...")
     logger = parent_logger.getChild("downloadWorker")
 
-    futures: list[Future] = []
-
     logger.debug("Setting up thread pool for downloads with %i workers.", thread_pool_size)
     executor = ThreadPoolExecutor(thread_pool_size, thread_name_prefix="Download gdrive file")
-    for queue_item in queue_items:
-        if cancel_token.log_if_cancelled(logger, "Requested cancellation during thread pool setup."):
-            break
+    futures: list[Future] = setup_futures(executor, queue_items, gdrive_client, debug_mode, logger, cancel_token=cancel_token)
 
-        futures.append(executor.submit(download_gdrive_file, queue_item, gdrive_client, logger, debug_mode, max_attempts=3))
-
-    for i, future in enumerate(futures, 1):
-        if cancel_token.cancelled:
-            if not future.done():
-                future.cancel()
-            continue
-
-        try:
-            queue_item: CollectionFileQueueItem = future.result(60)
-        except (CancelledError, OperationCanceledError):
-            continue
-        except TimeoutError:
-            worker_timed_out_flag.value = True
-            logger.warn("Future no. %i timed out.", i)
-            executor.shutdown(False, cancel_futures=True)
-            continue
-        except Exception as exc:
-            logger.warn("Future no. %i raised an error: %s", i, exc)
-            continue
-
-        if queue_item:  # If the operation was cancelled, None is returned
-            database_queue.put(
-                (
-                    queue_item,
-                    CollectionFileChange(downloaded_at=utils.get_now(), download_error=queue_item.error_while_downloading),
-                )
-            )
-            import_queue.put(queue_item)
+    logger.debug("Waiting for download futures to finish.")
+    wait_for_futures(futures, executor, database_queue, import_queue, worker_timed_out_flag, cancel_token, logger, 60.0)
 
     if cancel_token.cancelled:
         logger.debug("Shutting down thread pool, waiting for running downloads to complete.")
@@ -321,6 +290,68 @@ def worker_download(
     database_queue.put((None, None))
     import_queue.put(None)
     status_flag.value = False
+
+
+def wait_for_futures(
+    futures: Iterable[Future],
+    executor: ThreadPoolExecutor,
+    database_queue: queue.Queue,
+    import_queue: queue.Queue,
+    worker_timed_out_flag: StatusFlag,
+    cancel_token: CancellationToken,
+    logger: logging.Logger,
+    timeout: float = 60.0,
+):
+    for future_no, future in enumerate(futures, 1):
+        if cancel_token.cancelled:
+            if not future.done():
+                future.cancel()
+            continue
+
+        queue_item = wait_for_download(future, future_no, executor, worker_timed_out_flag, logger, timeout)
+        if queue_item:
+            database_queue.put(
+                (
+                    queue_item,
+                    CollectionFileChange(downloaded_at=utils.get_now(), download_error=queue_item.error_while_downloading),
+                )
+            )
+            import_queue.put(queue_item)
+
+
+def wait_for_download(
+    future: Future, future_no: int, executor: ThreadPoolExecutor, worker_timed_out_flag: StatusFlag, logger: logging.Logger, timeout: float = 60
+) -> Optional[CollectionFileQueueItem]:
+    try:
+        return future.result(timeout)
+    except (CancelledError, OperationCanceledError):
+        pass
+    except TimeoutError:
+        worker_timed_out_flag.value = True
+        logger.warn("Future no. %i timed out.", future_no)
+        executor.shutdown(False, cancel_futures=True)
+    except Exception as exc:
+        logger.warn("Future no. %i raised an error: %s", future_no, exc)
+
+    return None
+
+
+def setup_futures(
+    executor: ThreadPoolExecutor,
+    queue_items: Iterable[CollectionFileQueueItem],
+    gdrive_client: GoogleDriveClient,
+    debug_mode: bool,
+    logger: logging.Logger,
+    cancel_token: CancellationToken = None,
+) -> list[Future]:
+    futures = []
+    for queue_item in queue_items:
+        if cancel_token and cancel_token.log_if_cancelled(logger, "Requested cancellation during thread pool setup."):
+            break
+
+        futures.append(executor.submit(download_gdrive_file, queue_item, gdrive_client, logger, debug_mode, max_attempts=3))
+
+    return futures
 
 
 async def worker_import(
