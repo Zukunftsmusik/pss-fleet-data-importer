@@ -54,17 +54,7 @@ class GoogleDriveClient:
         return self.__logger
 
     def get_file_contents(self, file: pydrive2.files.GoogleDriveFile) -> str:
-        file_name = utils.get_gdrive_file_name(file)
-
-        try:
-            self.logger.debug("Downloading file: %s", file_name)
-            result = file.GetContentString()
-            self.logger.debug("Downloaded file: %s", file_name)
-        except (pydrive2.files.ApiRequestError, pydrive2.files.FileNotDownloadableError) as exc:
-            self.logger.warn("An error occured while downloading file '%s': %s", file_name, exc)
-            raise exc
-
-        return result
+        return get_file_contents(file, self.logger)
 
     def list_all_files(self) -> Generator[pydrive2.files.GoogleDriveFile, None, None]:
         self.__ensure_initialized()
@@ -182,6 +172,20 @@ class GoogleDriveClient:
 
         with open(settings_file_path, "w+") as fp:
             yaml.dump(contents, fp)
+
+
+def get_file_contents(file: pydrive2.files.GoogleDriveFile, logger: logging.Logger) -> str:
+    file_name = utils.get_gdrive_file_name(file)
+
+    try:
+        logger.debug("Downloading file: %s", file_name)
+        result = file.GetContentString()
+        logger.debug("Downloaded file: %s", file_name)
+    except (pydrive2.files.ApiRequestError, pydrive2.files.FileNotDownloadableError) as exc:
+        logger.warn("An error occured while downloading file '%s': %s", file_name, exc)
+        raise exc
+
+    return result
 
 
 __all__ = [
