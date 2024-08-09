@@ -60,7 +60,11 @@ class Importer:
             return False
 
     async def run_import_loop(self, modified_after: Optional[datetime] = None, modified_before: Optional[datetime] = None):
-        while not self.status.cancel_token.cancelled:
+        cancel_message = "Import cancelled. Exiting import loop."
+        while True:
+            if self.status.cancel_token.log_if_cancelled(self.logger, cancel_message):
+                break
+
             after = modified_after
             if not modified_after:
                 async with AsyncAutoRollbackSession(self.database) as session:
@@ -70,10 +74,15 @@ class Importer:
                     last_imported_file = await crud.get_latest_imported_collection_file(session)
                     after = utils.get_next_full_hour(last_imported_file.timestamp) if last_imported_file else None
 
+            if self.status.cancel_token.log_if_cancelled(self.logger, cancel_message):
+                break
+
             did_import = await self.run_bulk_import(modified_after=after, modified_before=modified_before)
 
-            if did_import:
+            if self.status.cancel_token.log_if_cancelled(self.logger, cancel_message):
+                break
 
+            if did_import:
                 continue
 
             now = utils.get_now()
@@ -270,6 +279,7 @@ def worker_download(
 
     database_queue.put((None, None))
     import_queue.put(None)
+
     status_flag.value = False
 
 
@@ -352,6 +362,8 @@ async def worker_import(
     queue_item: CollectionFileQueueItem = None
     none_count = 0
 
+    loop = asyncio.get_running_loop()
+
     while not cancel_token.cancelled:
         try:
             queue_item = import_queue.get(block=False)
@@ -422,7 +434,6 @@ def download_gdrive_file(
     max_download_attempts: int = 5,
 ) -> Optional[CollectionFileQueueItem]:
     logger = parent_logger.getChild("downloadGdriveFile")
-    download_error: Union[pydrive2.files.ApiRequestError, pydrive2.files.FileNotDownloadableError, IOError] = None
 
     # Attempt to download contents x times
     # If failed, raise DownloadError
@@ -528,7 +539,8 @@ def write_gdrive_file_to_disk(
                     fp.write(file_contents)
 
                 logger.debug("File no. %i written to disk: %s", item_no, file_path)
-            except IOError as download_error:
+            except IOError as exc:
+                download_error = exc
                 continue
 
             cancel_token.raise_if_cancelled(logger, "Cancelled download of file no. %i: %s", item_no, gdrive_file_name, log_level=logging.DEBUG)
