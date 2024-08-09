@@ -13,18 +13,19 @@ from typing import Iterable, Optional, Union
 import pydrive2.files
 from pss_fleet_data import PssFleetDataClient
 from pss_fleet_data.core.exceptions import ApiError, NonUniqueTimestampError
-from pydrive2.files import ApiRequestError, GoogleDriveFile
+from pydrive2.files import GoogleDriveFile
 
-from .core import utils, wrapper
-from .core.config import Config
-from .core.gdrive import GoogleDriveClient
-from .database import AsyncAutoRollbackSession, Database, crud
-from .models.cancellation_token import CancellationToken, OperationCancelledError
-from .models.collection_file_change import CollectionFileChange
-from .models.converters import FromCollectionFileDB, FromGdriveFile
-from .models.exceptions import DownloadFailedError
-from .models.queue_item import CollectionFileQueueItem
-from .models.status import ImportStatus, StatusFlag
+from ..core import utils, wrapper
+from ..core.config import Config
+from ..core.gdrive import GoogleDriveClient
+from ..database import AsyncAutoRollbackSession, Database, crud
+from ..models.cancellation_token import CancellationToken, OperationCancelledError
+from ..models.collection_file_change import CollectionFileChange
+from ..models.converters import FromCollectionFileDB, FromGdriveFile
+from ..models.exceptions import DownloadFailedError
+from ..models.queue_item import CollectionFileQueueItem
+from ..models.status import ImportStatus, StatusFlag
+from . import log
 
 
 class Importer:
@@ -106,7 +107,7 @@ class Importer:
         start = utils.get_now()
         print(f"### Starting bulk import at: {start.isoformat()}")
 
-        log_bulk_import_start(self.logger, modified_after, modified_before)
+        log.bulk_import_start(self.logger, modified_after, modified_before)
 
         self.logger.debug("Downloading Google Drive file list.")
         gdrive_files = self.__gdrive_client.list_files_by_modified_date(modified_after, modified_before)
@@ -131,7 +132,7 @@ class Importer:
         self.logger.debug("Ensuring that download path '%s' exists.", self.temp_download_folder)
         self.temp_download_folder.mkdir(parents=True, exist_ok=True)
 
-        log_downloads_imports(self.logger, queue_items)
+        log.downloads_imports(self.logger, queue_items)
 
         worker_threads = [
             threading.Thread(
@@ -190,7 +191,7 @@ class Importer:
             thread.join()
 
         end = utils.get_now()
-        log_bulk_import_finish(self.logger, queue_items, modified_after, modified_before)
+        log.bulk_import_finish(self.logger, queue_items, modified_after, modified_before)
         print(f"### Finished bulk import of {len(queue_items)} files at: {end.isoformat()} (after: {end - start})")
 
         return True
@@ -202,7 +203,7 @@ def get_gdrive_file_list(
     modified_after: Optional[datetime] = None,
     modified_before: Optional[datetime] = None,
 ) -> list[GoogleDriveFile]:
-    log_get_gdrive_file_list_params(logger, modified_after, modified_before)
+    log.get_gdrive_file_list_params(logger, modified_after, modified_before)
 
     if modified_after or modified_before:
         gdrive_files = list(gdrive_client.list_files_by_modified_date(modified_after=modified_after, modified_before=modified_before))
@@ -244,7 +245,7 @@ async def worker_db(
                 continue
 
         await queue_item.update_collection_file(database, change)
-        log_queue_item_update(logger, queue_item, change)
+        log.queue_item_update(logger, queue_item, change)
 
         database_queue.task_done()
 
@@ -410,7 +411,7 @@ async def worker_import(
 
         import_queue.task_done()
 
-    log_worker_ended(parent_logger, "Import worker", cancel_token)
+    log.worker_ended(parent_logger, "Import worker", cancel_token)
 
     database_queue.put((None, None))
     status_flag.value = False
@@ -510,14 +511,14 @@ def download_gdrive_file_contents(
     for attempt in range(max_download_attempts):
         cancel_token.raise_if_cancelled(logger, "Cancelled download of file no. %i: %s", item_no, gdrive_file_name, log_level=logging.DEBUG)
 
-        log_gdrive_file_download(logger, attempt, item_no, gdrive_file_name)
+        log.gdrive_file_download(logger, attempt, item_no, gdrive_file_name)
 
         try:
             file_contents = gdrive_client.get_file_contents(gdrive_file)
         except (pydrive2.files.ApiRequestError, pydrive2.files.FileNotDownloadableError) as exc:
             download_error = exc
             sleep_for = timedelta(seconds=2 ^ attempt, microseconds=random.randint(0, 1000000))
-            log_download_error(logger, item_no, gdrive_file_name, log_stack_trace, download_error, sleep_for)
+            log.download_error(logger, item_no, gdrive_file_name, log_stack_trace, download_error, sleep_for)
             time.sleep(sleep_for.total_seconds())  # Wait for a increasing time before retrying as recommended in the google API docs
             continue
 
@@ -636,71 +637,6 @@ def create_queues(queue_items: list[CollectionFileQueueItem]) -> tuple[list[tupl
     return download_queue_items, import_queue
 
 
-def log_bulk_import_finish(
-    logger: logging.Logger, queue_items: list[CollectionFileQueueItem], modified_after: Optional[datetime], modified_before: Optional[datetime]
-):
-    total_item_count = len(queue_items)
-    downloaded_item_count = len([queue_item for queue_item in queue_items if queue_item.collection_file.downloaded_at])
-    imported_item_count = len([queue_item for queue_item in queue_items if queue_item.collection_file.imported_at])
-
-    base_message = f"Finished bulk import. Downloaded {downloaded_item_count}, imported {imported_item_count} out of {total_item_count} files"
-
-    if modified_after:
-        if modified_before:
-            logger.info("%s modified after %s & modified before %s.", base_message, modified_after.isoformat(), modified_before.isoformat())
-        else:
-            logger.info("%s modified after %s.", base_message, modified_after.isoformat())
-    else:
-        if modified_before:
-            logger.info("%s modified before %s.", base_message, modified_before.isoformat())
-        else:
-            logger.info("%s.", base_message)
-
-
-def log_bulk_import_start(logger: logging.Logger, modified_after: Optional[datetime], modified_before: Optional[datetime]):
-    if modified_after:
-        if modified_before:
-            logger.info(
-                "Starting bulk import of files modified after %s & modified before %s.", modified_after.isoformat(), modified_before.isoformat()
-            )
-        else:
-            logger.info("Starting bulk import of files modified after %s.", modified_after.isoformat())
-    else:
-        if modified_before:
-            logger.info("Starting bulk import of files modified before %s.", modified_before.isoformat())
-        else:
-            logger.info("Starting bulk import.")
-
-
-def log_downloads_imports(logger: logging.Logger, queue_items: list[CollectionFileQueueItem]):
-    download_count = len([_ for _ in queue_items if _.collection_file.downloaded_at is None])
-    import_count = len([_ for _ in queue_items if _.collection_file.imported_at is None])
-    logger.info(f"Downloading {download_count} Collection files and importing {import_count} Collection files.")
-
-
-def log_get_gdrive_file_list_params(logger: logging.Logger, modified_after: Optional[datetime], modified_before: Optional[datetime]):
-    if modified_after or modified_before:
-        if modified_after:
-            if modified_before:
-                logger.info(
-                    "Retrieving gdrive files modified after: %s and modified before: %s", modified_after.isoformat(), modified_before.isoformat()
-                )
-            else:
-                logger.info("Retrieving gdrive files modified after: %s", modified_after.isoformat())
-        else:
-            logger.info("Retrieving gdrive files modified before: %s", modified_before.isoformat())
-    else:
-        logger.info("Retrieving all gdrive files.")
-
-
-def log_download_error(logger: logging.Logger, item_no: int, gdrive_file_name: str, log_stack_trace: bool, exc: ApiRequestError, sleep_for: int):
-    msg = f"An error occured while downloading the file no. {item_no} '{gdrive_file_name}' from Drive. Retrying in about {sleep_for} seconds."
-    if log_stack_trace:
-        logger.error(msg, exc_info=exc)
-    else:
-        logger.error("%s:  %s", msg, type(exc))
-
-
 async def skip_file_import_on_error(logger: logging.Logger, file_no: int, queue_item: CollectionFileQueueItem) -> bool:
     if queue_item.cancel_token.cancelled:
         return True
@@ -716,21 +652,3 @@ async def skip_file_import_on_error(logger: logging.Logger, file_no: int, queue_
             return True
 
     return False
-
-
-def log_queue_item_update(logger: logging.Logger, queue_item: CollectionFileQueueItem, change: CollectionFileChange):
-    logger.debug("Updated queue item no. %i: %s", queue_item.item_no, change)
-
-
-def log_worker_ended(logger: logging.Logger, worker_name: str, cancel_token: CancellationToken = None):
-    if cancel_token and cancel_token.cancelled:
-        logger.info("%s cancelled.", worker_name.strip())
-    else:
-        logger.info("%s finished.", worker_name.strip())
-
-
-def log_gdrive_file_download(logger: logging.Logger, attempt: int, item_no: int, gdrive_file_name: str):
-    if attempt > 0:
-        logger.warn("Attempt %i at downloading file no. %i: %s", attempt + 1, item_no, gdrive_file_name)
-    else:
-        logger.debug("Downloading file no. %i: %s", item_no, gdrive_file_name)
