@@ -6,6 +6,7 @@ import googleapiclient.errors
 import pydrive2.files
 import pytest
 
+from src.app.core import config
 from src.app.models.cancellation_token import CancellationToken
 
 
@@ -57,3 +58,8 @@ def google_api_errors(api_request_error: pydrive2.files.ApiRequestError) -> dict
         pydrive2.files.ApiRequestError: api_request_error,
         pydrive2.files.FileNotDownloadableError: pydrive2.files.FileNotDownloadableError(),
     }
+
+
+@pytest.fixture(scope="session")
+def configuration() -> config.Config:
+    return config.get_config()

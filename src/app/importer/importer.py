@@ -37,16 +37,16 @@ class Importer:
         gdrive_client: GoogleDriveClient,
         pss_fleet_data_client: PssFleetDataClient,
     ):
-        self.__config: Config = config
-        self.__database: Database = database
-        self.__gdrive_client: GoogleDriveClient = gdrive_client
-        self.__fleet_data_client: PssFleetDataClient = pss_fleet_data_client
+        self.config: Config = config
+        self.database: Database = database
+        self.gdrive_client: GoogleDriveClient = gdrive_client
+        self.fleet_data_client: PssFleetDataClient = pss_fleet_data_client
 
-        self.logger: logging.Logger = self.__config.logger.getChild(Importer.__name__)
+        self.logger: logging.Logger = self.config.logger.getChild(Importer.__name__)
         self.status = ImportStatus()
 
-        self.__import_queue: queue.Queue = queue.Queue()
-        self.__database_queue: queue.Queue = queue.Queue()
+        self.import_queue: queue.Queue = queue.Queue()
+        self.database_queue: queue.Queue = queue.Queue()
 
     def cancel_workers(self):
         self.logger.warn("Cancelling workers.")
@@ -54,7 +54,7 @@ class Importer:
 
     async def check_api_server_connection(self) -> bool:
         try:
-            await self.__fleet_data_client.ping()
+            await self.fleet_data_client.ping()
             return True
         except ConnectError:
             return False
@@ -63,7 +63,7 @@ class Importer:
         while not self.status.cancel_token.cancelled:
             after = modified_after
             if not modified_after:
-                async with AsyncAutoRollbackSession(self.__database) as session:
+                async with AsyncAutoRollbackSession(self.database) as session:
                     # Check DB for collection_file with earliest modified_date that wasn't imported, yet.
                     # crud.get_collection_files(imported=False)
                     # get min(collection_file.modified_date)
@@ -89,7 +89,7 @@ class Importer:
         log.bulk_import_start(self.logger, modified_after, modified_before)
 
         self.logger.debug("Downloading Google Drive file list.")
-        gdrive_files = self.__gdrive_client.list_files_by_modified_date(modified_after, modified_before)
+        gdrive_files = self.gdrive_client.list_files_by_modified_date(modified_after, modified_before)
         gdrive_files = wrapper.debug_log_running_time(self.logger, "Downloading file list")(list, gdrive_files)
 
         if not gdrive_files:
@@ -102,16 +102,14 @@ class Importer:
         collection_files.sort(key=lambda file: file.file_name.replace("-", "_"))  # There're files where some underscores are hyphens.
 
         self.logger.debug("Creating database entries.")
-        async with AsyncAutoRollbackSession(self.__database) as session:
+        async with AsyncAutoRollbackSession(self.database) as session:
             collection_files = await crud.insert_new_collection_files(session, collection_files)
 
         self.logger.debug("Creating queue items.")
-        queue_items = FromCollectionFileDB.to_queue_items(
-            gdrive_files, collection_files, self.__config.temp_download_folder, self.status.cancel_token
-        )
+        queue_items = FromCollectionFileDB.to_queue_items(gdrive_files, collection_files, self.config.temp_download_folder, self.status.cancel_token)
 
-        self.logger.debug("Ensuring that download path '%s' exists.", self.__config.temp_download_folder)
-        self.__config.temp_download_folder.mkdir(parents=True, exist_ok=True)
+        self.logger.debug("Ensuring that download path '%s' exists.", self.config.temp_download_folder)
+        self.config.temp_download_folder.mkdir(parents=True, exist_ok=True)
 
         log.downloads_imports(self.logger, queue_items)
 
@@ -121,15 +119,15 @@ class Importer:
                 name="Download worker",
                 args=[
                     queue_items,
-                    self.__gdrive_client,
-                    self.__config.download_thread_pool_size,
-                    self.__database_queue,
-                    self.__import_queue,
+                    self.gdrive_client,
+                    self.config.download_thread_pool_size,
+                    self.database_queue,
+                    self.import_queue,
                     self.status.bulk_download_running,
                     60.0,
                     self.status.download_worker_timed_out,
                     self.status.cancel_token,
-                    self.__config.debug_mode,
+                    self.config.debug_mode,
                     self.logger,
                 ],
                 daemon=True,
@@ -138,14 +136,14 @@ class Importer:
                 worker_import,
                 name="Import worker",
                 args=(
-                    self.__import_queue,
-                    self.__database_queue,
-                    self.__fleet_data_client,
+                    self.import_queue,
+                    self.database_queue,
+                    self.fleet_data_client,
                     self.status.bulk_import_running,
                     self.logger,
                     self.status.cancel_token,
                     1,
-                    self.__config.keep_downloaded_files,
+                    self.config.keep_downloaded_files,
                 ),
                 daemon=True,
             ),
@@ -153,8 +151,8 @@ class Importer:
                 worker_db,
                 name="Database worker",
                 args=(
-                    self.__database,
-                    self.__database_queue,
+                    self.database,
+                    self.database_queue,
                     self.logger,
                     self.status.bulk_database_running,
                     self.status.cancel_token,
