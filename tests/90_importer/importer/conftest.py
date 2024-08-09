@@ -1,4 +1,5 @@
 import pytest
+from pss_fleet_data import PssFleetDataClient
 from pydrive2.files import GoogleDriveFile
 
 from src.app.core import config
@@ -11,9 +12,19 @@ class MockGoogleDriveClient(GoogleDriveClient):
         pass
 
 
+class MockPssFleetDataClient(PssFleetDataClient):
+    def __init__(self):
+        pass
+
+
 @pytest.fixture(scope="function")
 def mock_gdrive_client() -> MockGoogleDriveClient:
     return MockGoogleDriveClient()
+
+
+@pytest.fixture(scope="function")
+def mock_fleet_data_client() -> MockGoogleDriveClient:
+    return MockPssFleetDataClient()
 
 
 @pytest.fixture(scope="function")
@@ -45,5 +56,5 @@ def patch_gdrive_client_get_file_contents(gdrive_file_contents: str, monkeypatch
 
 
 @pytest.fixture(scope="function")
-def importer(configuration: config.Config) -> Importer:
-    return Importer(configuration, None, None, None)
+def importer(configuration: config.Config, mock_fleet_data_client: PssFleetDataClient) -> Importer:
+    return Importer(configuration, None, None, mock_fleet_data_client)
