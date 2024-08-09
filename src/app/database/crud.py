@@ -197,6 +197,16 @@ async def get_latest_downloaded_collection_file(session: AsyncSession) -> Option
         return result.first()
 
 
+async def get_earliest_gdrive_modified_date(session: AsyncSession) -> Optional[datetime]:
+    async with session:
+        query = select(CollectionFileDB).where(is_(CollectionFileDB.imported_at, None)).order_by(asc(CollectionFileDB.gdrive_modified_date))
+        result = await session.exec(query)
+        collection_file = result.first()
+        if collection_file:
+            return collection_file.gdrive_modified_date
+        return None
+
+
 async def get_latest_imported_collection_file(session: AsyncSession) -> Optional[CollectionFileDB]:
     """Retrieves the CollectionFile with the most recent `timestamp`, which has already been imported.
 

@@ -68,11 +68,8 @@ class Importer:
             after = modified_after
             if not modified_after:
                 async with AsyncAutoRollbackSession(self.database) as session:
-                    # Check DB for collection_file with earliest modified_date that wasn't imported, yet.
-                    # crud.get_collection_files(imported=False)
-                    # get min(collection_file.modified_date)
-                    last_imported_file = await crud.get_latest_imported_collection_file(session)
-                    after = utils.get_next_full_hour(last_imported_file.timestamp) if last_imported_file else None
+                    earliest_not_imported_modified_date = await crud.get_earliest_gdrive_modified_date(session)
+                    after = utils.get_next_full_hour(earliest_not_imported_modified_date) if earliest_not_imported_modified_date else None
 
             if self.status.cancel_token.log_if_cancelled(self.logger, cancel_message):
                 break
@@ -361,8 +358,6 @@ async def worker_import(
 
     queue_item: CollectionFileQueueItem = None
     none_count = 0
-
-    loop = asyncio.get_running_loop()
 
     while not cancel_token.cancelled:
         try:
