@@ -51,7 +51,7 @@ def downloads_imports(logger: logging.Logger, queue_items: list[CollectionFileQu
     logger.info(f"Downloading {download_count} Collection files and importing {import_count} Collection files.")
 
 
-def get_gdrive_file_list_params(logger: logging.Logger, modified_after: Optional[datetime], modified_before: Optional[datetime]):
+def gdrive_file_list_params(logger: logging.Logger, modified_after: Optional[datetime], modified_before: Optional[datetime]):
     if modified_after or modified_before:
         if modified_after:
             if modified_before:
