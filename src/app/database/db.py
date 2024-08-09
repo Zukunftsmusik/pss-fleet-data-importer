@@ -20,7 +20,7 @@ from .models import *  # noqa: F403, F401
 
 
 class Database:
-    def __init__(self, async_connection_string: str, sync_connection_string: str, echo: bool = False):
+    def __init__(self, sync_connection_string: str, async_connection_string: str, echo: bool = False):
         self.async_connection_string = async_connection_string
         self.sync_connection_string = sync_connection_string
         self.echo = echo or False
@@ -136,11 +136,7 @@ class Database:
         engine.dispose()
 
 
-__DATABASE = Database(
-    config.get_config().db_async_connection_str,
-    config.get_config().db_sync_connection_str,
-    config.get_config().db_engine_echo,
-)
+__DATABASE: Database = None
 
 
 class AsyncAutoRollbackSession(AbstractAsyncContextManager):
@@ -172,6 +168,15 @@ class AsyncAutoRollbackSession(AbstractAsyncContextManager):
 
 
 def get_db():
+    global __DATABASE
+    if not __DATABASE:
+        configuration = config.get_config()
+        __DATABASE = Database(
+            configuration.db_sync_connection_str,
+            configuration.db_async_connection_str,
+            configuration.db_engine_echo,
+        )
+        __DATABASE.initialize_database(reinitialize=configuration.reinitialize_database_on_startup)
     return __DATABASE
 
 

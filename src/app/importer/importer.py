@@ -34,48 +34,19 @@ class Importer:
         self,
         config: Config,
         database: Database,
-        gdrive_folder_id: str = None,
-        api_server_url: str = None,
-        api_key: str = None,
-        download_thread_pool_size: int = 3,
-        temp_download_folder: Path = None,
+        gdrive_client: GoogleDriveClient,
+        pss_fleet_data_client: PssFleetDataClient,
     ):
         self.__config: Config = config
+        self.__database: Database = database
+        self.__gdrive_client: GoogleDriveClient = gdrive_client
+        self.__fleet_data_client: PssFleetDataClient = pss_fleet_data_client
 
-        self.api_server_url: str = api_server_url or self.__config.api_default_server_url
-        self.gdrive_folder_id: str = gdrive_folder_id or self.__config.gdrive_folder_id
         self.logger: logging.Logger = self.__config.logger.getChild(Importer.__name__)
         self.status = ImportStatus()
-        self.thread_pool_size: int = download_thread_pool_size
-        self.temp_download_folder: Path = temp_download_folder or self.__config.temp_download_folder
-
-        self.__database: Database = database
-        self.__api_key: str = api_key or self.__config.api_key
 
         self.__import_queue: queue.Queue = queue.Queue()
         self.__database_queue: queue.Queue = queue.Queue()
-
-        self.__database.initialize_database(
-            self.__config.db_sync_connection_str,
-            self.__config.db_async_connection_str,
-            self.__config.debug_mode,
-            self.__config.reinitialize_database_on_startup,
-        )
-
-        self.__gdrive_client: GoogleDriveClient = GoogleDriveClient(
-            config.gdrive_project_id,
-            config.gdrive_private_key_id,
-            config.gdrive_private_key,
-            config.gdrive_client_email,
-            config.gdrive_client_id,
-            config.gdrive_scopes,
-            self.gdrive_folder_id,
-            config.gdrive_service_account_file_path,
-            config.gdrive_settings_file_path,
-            logger=config.logger,
-        )
-
-        self.__fleet_data_client: PssFleetDataClient = PssFleetDataClient(self.api_server_url, self.__api_key)
 
     def cancel_workers(self):
         self.logger.warn("Cancelling workers.")
@@ -135,10 +106,12 @@ class Importer:
             collection_files = await crud.insert_new_collection_files(session, collection_files)
 
         self.logger.debug("Creating queue items.")
-        queue_items = FromCollectionFileDB.to_queue_items(gdrive_files, collection_files, self.temp_download_folder, self.status.cancel_token)
+        queue_items = FromCollectionFileDB.to_queue_items(
+            gdrive_files, collection_files, self.__config.temp_download_folder, self.status.cancel_token
+        )
 
-        self.logger.debug("Ensuring that download path '%s' exists.", self.temp_download_folder)
-        self.temp_download_folder.mkdir(parents=True, exist_ok=True)
+        self.logger.debug("Ensuring that download path '%s' exists.", self.__config.temp_download_folder)
+        self.__config.temp_download_folder.mkdir(parents=True, exist_ok=True)
 
         log.downloads_imports(self.logger, queue_items)
 
@@ -149,7 +122,7 @@ class Importer:
                 args=[
                     queue_items,
                     self.__gdrive_client,
-                    self.thread_pool_size,
+                    self.__config.download_thread_pool_size,
                     self.__database_queue,
                     self.__import_queue,
                     self.status.bulk_download_running,
@@ -167,7 +140,6 @@ class Importer:
                 args=(
                     self.__import_queue,
                     self.__database_queue,
-                    self.__api_key,
                     self.__fleet_data_client,
                     self.status.bulk_import_running,
                     self.logger,
@@ -368,7 +340,6 @@ def setup_futures(
 async def worker_import(
     import_queue: queue.Queue,
     database_queue: queue.Queue,
-    api_key: str,
     fleet_data_client: PssFleetDataClient,
     status_flag: StatusFlag,
     parent_logger: logging.Logger,
@@ -406,7 +377,7 @@ async def worker_import(
         logger.debug("Importing file no. %i: %s", queue_item.item_no, queue_item.download_file_path)
 
         try:
-            imported_at = await import_file(fleet_data_client, queue_item, api_key, logger)
+            imported_at = await import_file(fleet_data_client, queue_item, logger)
         except ApiError as exc:
             logger.error("Could not import file no. %i: %s", queue_item.item_no, queue_item.gdrive_file_name)
             logger.error(exc, exc_info=True)
@@ -425,9 +396,9 @@ async def worker_import(
     status_flag.value = False
 
 
-async def import_file(fleet_data_client: PssFleetDataClient, queue_item: CollectionFileQueueItem, api_key: str, logger: logging.Logger) -> datetime:
+async def import_file(fleet_data_client: PssFleetDataClient, queue_item: CollectionFileQueueItem, logger: logging.Logger) -> datetime:
     try:
-        collection_metadata = await fleet_data_client.upload_collection(str(queue_item.download_file_path), api_key=api_key)
+        collection_metadata = await fleet_data_client.upload_collection(queue_item.download_file_path)
         imported_at = utils.remove_timezone(datetime.now(tz=timezone.utc))
         logger.info(
             "Imported file no. %i (Collection ID: %i): %s", queue_item.item_no, collection_metadata.collection_id, queue_item.download_file_path

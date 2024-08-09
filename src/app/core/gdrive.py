@@ -47,8 +47,6 @@ class GoogleDriveClient:
         self.__gauth: pydrive2.auth.GoogleAuth = None
         self.__drive: pydrive2.drive.GoogleDrive = None
 
-        self.__initialize()
-
     @property
     def logger(self) -> logging.Logger:
         return self.__logger
@@ -94,10 +92,10 @@ class GoogleDriveClient:
     def __ensure_initialized(self) -> None:
         try:
             self.__drive.ListFile({"q": f"{self.__base_criteria} and title contains 'highaöegjoyödfmj giod'"}).GetList()
-        except pydrive2.auth.InvalidConfigError:
-            self.__initialize()
+        except (pydrive2.auth.InvalidConfigError, AttributeError):
+            self.initialize()
 
-    def __initialize(self) -> None:
+    def initialize(self) -> None:
         service_account_file = Path(self.__service_account_file_path)
         if service_account_file.exists() and not utils.is_empty_file(service_account_file):
             self.logger.info(f"Using existing Service Account Credentials file: {service_account_file.absolute()}")
