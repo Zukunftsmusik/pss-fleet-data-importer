@@ -47,7 +47,7 @@ test_cases_valid = [
 
 
 @pytest.mark.parametrize(["exception_type"], test_cases_do_not_log_exception)
-def test_get_file_contents_do_not_log_exception(
+def test_do_not_log_exception(
     exception_type: type[Exception],
     logger: logging.Logger,
     monkeypatch: pytest.MonkeyPatch,
@@ -68,7 +68,7 @@ def test_get_file_contents_do_not_log_exception(
 
 
 @pytest.mark.parametrize(["exception_type", "exception_instance"], test_cases_log_exception)
-def test_get_file_contents_log_exception(
+def test_log_exception(
     exception_type: type[Exception],
     exception_instance: Exception,
     logger: logging.Logger,
@@ -92,7 +92,7 @@ def test_get_file_contents_log_exception(
 
 
 @pytest.mark.parametrize(["content"], test_cases_valid)
-def test_get_file_contents_valid(
+def test_returns_contents(
     content: Optional[str],
     logger: logging.Logger,
     monkeypatch: pytest.MonkeyPatch,

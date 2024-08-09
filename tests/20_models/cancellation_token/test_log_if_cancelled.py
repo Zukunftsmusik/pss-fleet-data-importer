@@ -32,7 +32,7 @@ test_cases_cancelled_not_captured = [
 
 
 @pytest.mark.parametrize(["log_message", "log_level", "capture_log_level"], test_cases_cancelled_captured)
-def test_log_if_cancelled_cancelled_captured(
+def test_capture_logs(
     log_message: str,
     log_level: int,
     capture_log_level: int,
@@ -49,7 +49,7 @@ def test_log_if_cancelled_cancelled_captured(
 
 
 @pytest.mark.parametrize(["log_level", "capture_log_level"], test_cases_cancelled_not_captured)
-def test_log_if_cancelled_cancelled_not_captured(
+def test_capture_no_logs(
     log_level: int,
     capture_log_level: int,
     logger: logging.Logger,
@@ -65,7 +65,7 @@ def test_log_if_cancelled_cancelled_not_captured(
 
 
 @pytest.mark.parametrize(["log_level", "capture_log_level"], test_cases_not_cancelled)
-def test_log_if_cancelled_not_cancelled(
+def test_not_cancelled(
     log_level: int,
     capture_log_level: int,
     logger: logging.Logger,
