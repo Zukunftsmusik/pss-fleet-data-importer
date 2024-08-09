@@ -19,7 +19,7 @@ from .core import utils, wrapper
 from .core.config import Config
 from .core.gdrive import GoogleDriveClient
 from .database import AsyncAutoRollbackSession, Database, crud
-from .models.cancellation_token import CancellationToken, OperationCanceledError
+from .models.cancellation_token import CancellationToken, OperationCancelledError
 from .models.collection_file_change import CollectionFileChange
 from .models.converters import FromCollectionFileDB, FromGdriveFile
 from .models.exceptions import DownloadFailedError
@@ -326,7 +326,7 @@ def wait_for_download(
 ) -> Optional[CollectionFileQueueItem]:
     try:
         return future.result(timeout)
-    except (CancelledError, OperationCanceledError):
+    except (CancelledError, OperationCancelledError):
         pass
     except TimeoutError:
         worker_timed_out_flag.value = True
@@ -440,7 +440,7 @@ def download_gdrive_file(
     queue_item: CollectionFileQueueItem,
     gdrive_client: GoogleDriveClient,
     parent_logger: logging.Logger,
-    debug_mode: bool,
+    log_stack_trace_on_download_error: bool,
     max_download_attempts: int = 5,
 ) -> Optional[CollectionFileQueueItem]:
     logger = parent_logger.getChild("downloadGdriveFile")
@@ -467,8 +467,8 @@ def download_gdrive_file(
             gdrive_client,
             queue_item.cancel_token,
             queue_item.item_no,
-            debug_mode,
             max_download_attempts,
+            log_stack_trace_on_download_error,
             logger,
         )
     except (pydrive2.files.ApiRequestError, pydrive2.files.FileNotDownloadableError) as download_error:
@@ -500,8 +500,8 @@ def download_gdrive_file_contents(
     gdrive_client: GoogleDriveClient,
     cancel_token: CancellationToken,
     item_no: int,
-    debug_mode: bool,
     max_download_attempts: int,
+    log_stack_trace: bool,
     logger: logging.Logger,
 ):
     download_error: Union[pydrive2.files.ApiRequestError, pydrive2.files.FileNotDownloadableError] = None
@@ -514,9 +514,10 @@ def download_gdrive_file_contents(
 
         try:
             file_contents = gdrive_client.get_file_contents(gdrive_file)
-        except (pydrive2.files.ApiRequestError, pydrive2.files.FileNotDownloadableError) as download_error:
+        except (pydrive2.files.ApiRequestError, pydrive2.files.FileNotDownloadableError) as exc:
+            download_error = exc
             sleep_for = timedelta(seconds=2 ^ attempt, microseconds=random.randint(0, 1000000))
-            log_download_error(logger, item_no, gdrive_file_name, debug_mode, download_error, sleep_for)
+            log_download_error(logger, item_no, gdrive_file_name, log_stack_trace, download_error, sleep_for)
             time.sleep(sleep_for.total_seconds())  # Wait for a increasing time before retrying as recommended in the google API docs
             continue
 
@@ -692,9 +693,9 @@ def log_get_gdrive_file_list_params(logger: logging.Logger, modified_after: Opti
         logger.info("Retrieving all gdrive files.")
 
 
-def log_download_error(logger: logging.Logger, item_no: int, gdrive_file_name: str, log_exception: bool, exc: ApiRequestError, sleep_for: timedelta):
-    msg = f"An error occured while downloading the file no. {item_no} '{gdrive_file_name}' from Drive. Retrying in {sleep_for.total_seconds():.2f} seconds."
-    if log_exception:
+def log_download_error(logger: logging.Logger, item_no: int, gdrive_file_name: str, log_stack_trace: bool, exc: ApiRequestError, sleep_for: int):
+    msg = f"An error occured while downloading the file no. {item_no} '{gdrive_file_name}' from Drive. Retrying in about {sleep_for} seconds."
+    if log_stack_trace:
         logger.error(msg, exc_info=exc)
     else:
         logger.error("%s:  %s", msg, type(exc))

@@ -4,7 +4,7 @@ from typing import Any
 from cancel_token import CancellationToken as CT
 
 
-class OperationCanceledError(Exception):
+class OperationCancelledError(Exception):
     pass
 
 
@@ -31,11 +31,11 @@ class CancellationToken(CT):
         if self.cancelled:
             if logger and log_message:
                 logger.log(log_level, log_message, *log_message_args)
-            raise OperationCanceledError(exception_message or "")
+            raise OperationCancelledError(exception_message or "")
         return False
 
 
 __all__ = [
     CancellationToken.__name__,
-    OperationCanceledError.__name__,
+    OperationCancelledError.__name__,
 ]
