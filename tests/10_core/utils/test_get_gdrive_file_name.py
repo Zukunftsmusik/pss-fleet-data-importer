@@ -4,7 +4,7 @@ from pydrive2.files import GoogleDriveFile
 from src.app.core.utils import get_gdrive_file_name
 
 
-test_cases = [
+test_cases_valid = [
     # gdrive_file: GoogleDriveFile, expected_result: str
     pytest.param(GoogleDriveFile(None, {}), None, id="empty"),
     pytest.param(GoogleDriveFile(None, {"title": None}), None, id="v2_None"),
@@ -18,7 +18,7 @@ test_cases = [
 """gdrive_file: GoogleDriveFile, expected_result: str"""
 
 
-@pytest.mark.parametrize(["gdrive_file", "expected_result"], test_cases)
-def test_get_gdrive_file_name(gdrive_file: GoogleDriveFile, expected_result: str):
+@pytest.mark.parametrize(["gdrive_file", "expected_result"], test_cases_valid)
+def test_valid(gdrive_file: GoogleDriveFile, expected_result: str):
     result = get_gdrive_file_name(gdrive_file)
     assert result == expected_result

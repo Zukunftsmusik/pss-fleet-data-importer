@@ -29,12 +29,12 @@ test_cases_valid = [
 
 
 @pytest.mark.parametrize(["value", "expected_exception"], test_cases_invalid)
-def test_remove_timezone_invalid(value, expected_exception):
+def test_invalid(value, expected_exception):
     with pytest.raises(expected_exception):
         _ = remove_timezone(value)
 
 
 @pytest.mark.parametrize(["value", "expected_result"], test_cases_valid)
-def test_remove_timezone_valid(value, expected_result):
+def test_valid(value, expected_result):
     result = remove_timezone(value)
     assert result == expected_result
