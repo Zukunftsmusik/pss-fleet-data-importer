@@ -1,32 +1,22 @@
 import asyncio
-import json
 import logging
 import queue
-import random
 import threading
-import time
-from concurrent.futures import CancelledError, Future, ThreadPoolExecutor
-from datetime import datetime, timedelta, timezone
-from pathlib import Path
-from typing import Iterable, Optional, Union
+from datetime import datetime, timedelta
+from typing import Optional
 
-import pydrive2.files
 from httpx import ConnectError
 from pss_fleet_data import PssFleetDataClient
-from pss_fleet_data.core.exceptions import ApiError, NonUniqueTimestampError
 from pydrive2.files import GoogleDriveFile
 
 from ..core import utils, wrapper
 from ..core.config import Config
 from ..core.gdrive import GoogleDriveClient
 from ..database import AsyncAutoRollbackSession, Database, crud
-from ..models.cancellation_token import CancellationToken, OperationCancelledError
-from ..models.collection_file_change import CollectionFileChange
 from ..models.converters import FromCollectionFileDB, FromGdriveFile
-from ..models.exceptions import DownloadFailedError
 from ..models.queue_item import CollectionFileQueueItem
-from ..models.status import ImportStatus, StatusFlag
-from . import log
+from ..models.status import ImportStatus
+from . import database_worker, download_worker, import_worker, log
 
 
 class Importer:
@@ -121,7 +111,7 @@ class Importer:
 
         worker_threads = [
             threading.Thread(
-                target=worker_download,
+                target=download_worker.worker,
                 name="Download worker",
                 args=[
                     queue_items,
@@ -139,7 +129,7 @@ class Importer:
                 daemon=True,
             ),
             utils.create_async_thread(
-                worker_import,
+                import_worker.worker,
                 name="Import worker",
                 args=(
                     self.import_queue,
@@ -154,7 +144,7 @@ class Importer:
                 daemon=True,
             ),
             utils.create_async_thread(
-                worker_db,
+                database_worker.worker,
                 name="Database worker",
                 args=(
                     self.database,
@@ -181,6 +171,17 @@ class Importer:
         return True
 
 
+def create_queues(queue_items: list[CollectionFileQueueItem]) -> tuple[list[tuple[int, CollectionFileQueueItem]], queue.Queue]:
+    download_queue_items: list[tuple[int, CollectionFileQueueItem]] = []
+    import_queue: queue.Queue = queue.Queue()
+
+    for queue_item in queue_items:
+        download_queue_items.append(queue_item)
+        import_queue.put(queue_item)
+
+    return download_queue_items, import_queue
+
+
 def get_gdrive_file_list(
     gdrive_client: GoogleDriveClient,
     logger: logging.Logger,
@@ -195,444 +196,3 @@ def get_gdrive_file_list(
         gdrive_files = list(gdrive_client.list_all_files())
 
     return gdrive_files
-
-
-async def worker_db(
-    database: Database,
-    database_queue: queue.Queue,
-    parent_logger: logging.Logger,
-    status_flag: StatusFlag,
-    cancel_token: CancellationToken,
-    exit_after_none_count: int,
-):
-    status_flag.value = True
-    parent_logger.info("Database worker started...")
-    logger = parent_logger.parent.getChild("databaseWorker")
-
-    queue_item: CollectionFileQueueItem
-    change: CollectionFileChange
-    none_count = 0
-
-    while not cancel_token.cancelled:
-        try:
-            queue_item, change = database_queue.get(block=False)
-        except queue.Empty:
-            await asyncio.sleep(0.1)
-            continue
-
-        if queue_item is None and change is None:
-            none_count += 1
-
-            if none_count == exit_after_none_count:
-                break
-            else:
-                continue
-
-        await queue_item.update_collection_file(database, change)
-        log.queue_item_update(logger, queue_item, change)
-
-        database_queue.task_done()
-
-    if cancel_token.cancelled:
-        parent_logger.info("Database worker cancelled.")
-    else:
-        parent_logger.info("Database worker finished.")
-    status_flag.value = False
-
-
-def worker_download(
-    queue_items: Iterable[CollectionFileQueueItem],
-    gdrive_client: GoogleDriveClient,
-    thread_pool_size: int,
-    database_queue: queue.Queue,
-    import_queue: queue.Queue,
-    status_flag: StatusFlag,
-    worker_timeout: float,
-    worker_timed_out_flag: StatusFlag,
-    cancel_token: CancellationToken,
-    debug_mode: bool,
-    parent_logger: logging.Logger,
-):
-    status_flag.value = True
-    worker_timed_out_flag.value = False
-
-    parent_logger.info("Download worker started...")
-    logger = parent_logger.getChild("downloadWorker")
-
-    logger.debug("Setting up thread pool for downloads with %i workers.", thread_pool_size)
-    executor = ThreadPoolExecutor(thread_pool_size, thread_name_prefix="Download gdrive file")
-    futures: list[Future] = setup_futures(executor, queue_items, gdrive_client, debug_mode, logger, cancel_token=cancel_token)
-
-    logger.debug("Waiting for download futures to finish.")
-    wait_for_futures(futures, executor, database_queue, import_queue, worker_timed_out_flag, cancel_token, logger, worker_timeout)
-
-    if cancel_token.cancelled:
-        logger.debug("Shutting down thread pool, waiting for running downloads to complete.")
-        executor.shutdown(cancel_futures=True)
-        parent_logger.info("Download worker cancelled.")
-    else:
-        executor.shutdown()
-        parent_logger.info("Download worker finished.")
-
-    database_queue.put((None, None))
-    import_queue.put(None)
-
-    status_flag.value = False
-
-
-def wait_for_futures(
-    futures: Iterable[Future],
-    executor: ThreadPoolExecutor,
-    database_queue: queue.Queue,
-    import_queue: queue.Queue,
-    worker_timed_out_flag: StatusFlag,
-    cancel_token: CancellationToken,
-    logger: logging.Logger,
-    timeout: float = 60.0,
-):
-    for future_no, future in enumerate(futures, 1):
-        if cancel_token.cancelled:
-            if not future.done():
-                future.cancel()
-            continue
-
-        queue_item = wait_for_download(future, future_no, executor, worker_timed_out_flag, logger, timeout)
-        if queue_item:
-            database_queue.put(
-                (
-                    queue_item,
-                    CollectionFileChange(downloaded_at=utils.get_now(), download_error=queue_item.error_while_downloading),
-                )
-            )
-            import_queue.put(queue_item)
-
-
-def wait_for_download(
-    future: Future, future_no: int, executor: ThreadPoolExecutor, worker_timed_out_flag: StatusFlag, logger: logging.Logger, timeout: float = 60
-) -> Optional[CollectionFileQueueItem]:
-    try:
-        return future.result(timeout)
-    except (CancelledError, OperationCancelledError):
-        pass
-    except TimeoutError:
-        worker_timed_out_flag.value = True
-        logger.warn("Future no. %i timed out.", future_no)
-        executor.shutdown(False, cancel_futures=True)
-    except Exception as exc:
-        logger.warn("Future no. %i raised an error: %s", future_no, exc)
-
-    return None
-
-
-def setup_futures(
-    executor: ThreadPoolExecutor,
-    queue_items: Iterable[CollectionFileQueueItem],
-    gdrive_client: GoogleDriveClient,
-    debug_mode: bool,
-    logger: logging.Logger,
-    cancel_token: CancellationToken = None,
-) -> list[Future]:
-    futures = []
-    for queue_item in queue_items:
-        if cancel_token and cancel_token.log_if_cancelled(logger, "Requested cancellation during thread pool setup."):
-            break
-
-        futures.append(executor.submit(download_gdrive_file, queue_item, gdrive_client, logger, debug_mode, max_download_attempts=3))
-
-    return futures
-
-
-async def worker_import(
-    import_queue: queue.Queue,
-    database_queue: queue.Queue,
-    fleet_data_client: PssFleetDataClient,
-    status_flag: StatusFlag,
-    parent_logger: logging.Logger,
-    cancel_token: CancellationToken,
-    exit_after_none_count: int,
-    keep_downloaded_files: bool = False,
-):
-    status_flag.value = True
-    parent_logger.info("Import worker started...")
-    logger = parent_logger.parent.getChild("importWorker")
-
-    queue_item: CollectionFileQueueItem = None
-    none_count = 0
-
-    while not cancel_token.cancelled:
-        try:
-            queue_item = import_queue.get(block=False)
-        except queue.Empty:
-            await asyncio.sleep(0.1)
-            continue
-
-        if queue_item is None:
-            none_count += 1
-
-            if none_count == exit_after_none_count:
-                break
-            else:
-                continue
-
-        if await skip_file_import_on_error(logger, queue_item.item_no, queue_item):
-            logger.error("Could not import file no. %i: %s", queue_item.item_no, queue_item.gdrive_file_name)
-            import_queue.task_done()
-            continue
-
-        logger.debug("Importing file no. %i: %s", queue_item.item_no, queue_item.download_file_path)
-
-        try:
-            imported_at = await import_file(fleet_data_client, queue_item, logger)
-        except ApiError as exc:
-            logger.error("Could not import file no. %i: %s", queue_item.item_no, queue_item.gdrive_file_name)
-            logger.error(exc, exc_info=True)
-            continue
-
-        database_queue.put((queue_item, CollectionFileChange(imported_at=imported_at)))
-
-        if not keep_downloaded_files:
-            queue_item.download_file_path.unlink(missing_ok=True)
-
-        import_queue.task_done()
-
-    log.worker_ended(parent_logger, "Import worker", cancel_token)
-
-    database_queue.put((None, None))
-    status_flag.value = False
-
-
-async def import_file(fleet_data_client: PssFleetDataClient, queue_item: CollectionFileQueueItem, logger: logging.Logger) -> datetime:
-    try:
-        collection_metadata = await fleet_data_client.upload_collection(queue_item.download_file_path)
-        imported_at = utils.remove_timezone(datetime.now(tz=timezone.utc))
-        logger.info(
-            "Imported file no. %i (Collection ID: %i): %s", queue_item.item_no, collection_metadata.collection_id, queue_item.download_file_path
-        )
-    except NonUniqueTimestampError:
-        imported_at = utils.remove_timezone(datetime.now(tz=timezone.utc))
-        collection_metadata = await fleet_data_client.get_most_recent_collection_metadata_by_timestamp(queue_item.collection_file.timestamp)
-        logger.info(
-            "Skipped file no. %i (Collection already exists with ID: %i): %s",
-            queue_item.item_no,
-            collection_metadata.collection_id,
-            queue_item.download_file_path,
-        )
-
-    return imported_at
-
-
-def download_gdrive_file(
-    queue_item: CollectionFileQueueItem,
-    gdrive_client: GoogleDriveClient,
-    parent_logger: logging.Logger,
-    log_stack_trace_on_download_error: bool,
-    max_download_attempts: int = 5,
-) -> Optional[CollectionFileQueueItem]:
-    logger = parent_logger.getChild("downloadGdriveFile")
-
-    # Attempt to download contents x times
-    # If failed, raise DownloadError
-    # Attempt to write contents to disk y times
-    # If failed, raise DownloadError
-    # Return queue_item
-
-    if check_if_exists(queue_item.item_no, queue_item.gdrive_file_size, queue_item.target_file_path, logger=logger):
-        queue_item.download_file_path = queue_item.target_file_path
-        logger.debug("File no. %i already exists: %s", queue_item.item_no, queue_item.download_file_path)
-
-        return queue_item
-    else:
-        logger.debug("Making sure that file no. %i does not exist.", queue_item.item_no)
-        queue_item.target_file_path.unlink(missing_ok=True)  # File also counts as not existing, if the file size differs from the file on gdrive
-
-    try:
-        file_contents = download_gdrive_file_contents(
-            queue_item.gdrive_file,
-            gdrive_client,
-            queue_item.cancel_token,
-            queue_item.item_no,
-            max_download_attempts,
-            log_stack_trace_on_download_error,
-            logger,
-        )
-    except (pydrive2.files.ApiRequestError, pydrive2.files.FileNotDownloadableError) as download_error:
-        queue_item.download_file_path = None
-        queue_item.error_while_downloading = True
-        raise DownloadFailedError(queue_item.gdrive_file_name, str(download_error), inner_exception=download_error) from download_error
-
-    try:
-        queue_item.download_file_path, queue_item.error_while_downloading = write_gdrive_file_to_disk(
-            file_contents,
-            queue_item.target_file_path,
-            queue_item.cancel_token,
-            queue_item.item_no,
-            queue_item.gdrive_file_name,
-            queue_item.gdrive_file_size,
-            max_download_attempts,
-            logger,
-        )
-    except IOError as download_error:
-        queue_item.download_file_path = None
-        queue_item.error_while_downloading = True
-        raise DownloadFailedError(queue_item.gdrive_file_name, str(download_error), inner_exception=download_error) from download_error
-
-    return queue_item
-
-
-def download_gdrive_file_contents(
-    gdrive_file: GoogleDriveFile,
-    gdrive_client: GoogleDriveClient,
-    cancel_token: CancellationToken,
-    item_no: int,
-    max_download_attempts: int,
-    log_stack_trace: bool,
-    logger: logging.Logger,
-):
-    download_error: Union[pydrive2.files.ApiRequestError, pydrive2.files.FileNotDownloadableError] = None
-    gdrive_file_name = utils.get_gdrive_file_name(gdrive_file)
-
-    for attempt in range(max_download_attempts):
-        cancel_token.raise_if_cancelled(logger, "Cancelled download of file no. %i: %s", item_no, gdrive_file_name, log_level=logging.DEBUG)
-
-        log.gdrive_file_download(logger, attempt, item_no, gdrive_file_name)
-
-        try:
-            file_contents = gdrive_client.get_file_contents(gdrive_file)
-        except (pydrive2.files.ApiRequestError, pydrive2.files.FileNotDownloadableError) as exc:
-            download_error = exc
-            sleep_for = timedelta(seconds=2 ^ attempt, microseconds=random.randint(0, 1000000))
-            log.download_error(logger, item_no, gdrive_file_name, log_stack_trace, download_error, sleep_for)
-            time.sleep(sleep_for.total_seconds())  # Wait for a increasing time before retrying as recommended in the google API docs
-            continue
-
-        cancel_token.raise_if_cancelled(logger, "Cancelled download of file no. %i: %s", item_no, gdrive_file_name, log_level=logging.DEBUG)
-        logger.debug("File no. %i downloaded: %s", item_no, gdrive_file_name)
-
-        return file_contents
-
-    raise download_error
-
-
-def write_gdrive_file_to_disk(
-    file_contents: str,
-    file_path: Union[Path, str],
-    cancel_token: CancellationToken,
-    item_no: int,
-    gdrive_file_name: str,
-    gdrive_file_size: int,
-    max_write_attempts: int,
-    logger: logging.Logger,
-) -> tuple[Path, bool]:
-    if file_contents:
-        download_error: IOError = None
-
-        for _ in range(max_write_attempts):
-            cancel_token.raise_if_cancelled(logger, "Cancelled download of file no. %i: %s", item_no, gdrive_file_name, log_level=logging.DEBUG)
-
-            try:
-                with open(file_path, "w") as fp:
-                    fp.write(file_contents)
-
-                logger.debug("File no. %i written to disk: %s", item_no, file_path)
-            except IOError as exc:
-                download_error = exc
-                continue
-
-            cancel_token.raise_if_cancelled(logger, "Cancelled download of file no. %i: %s", item_no, gdrive_file_name, log_level=logging.DEBUG)
-
-            while not check_if_exists(item_no, gdrive_file_size, file_path):  # It may take some time for the file contents to be flushed to disk
-                cancel_token.raise_if_cancelled(logger, "Cancelled download of file no. %i: %s", item_no, gdrive_file_name, log_level=logging.DEBUG)
-
-                time.sleep(0.1)
-
-            return file_path, False
-
-        raise download_error
-
-    return None, True
-
-
-def check_if_exists(item_no: int, expected_file_size: int, check_path: Union[Path, str], logger: Optional[logging.Logger] = None) -> bool:
-    if logger:
-        logger.debug("Checking if file no. %i exists at: %s", item_no, check_path)
-
-    if check_path.exists():
-        if logger:
-            logger.debug("Getting file size of file no. %i.", item_no)
-
-        file_size = check_path.stat().st_size
-        if logger:
-            logger.debug("File size of file no. %i is: %i", item_no, file_size)
-            logger.debug("Checking if file size matches gdrive file for file no. %i.", item_no)
-
-        if file_size == expected_file_size:
-            if logger:
-                logger.debug("File size of file no. %i matches gdrive file.", item_no)
-            return True
-        else:
-            if logger:
-                logger.debug("File size of file no. %i does not match gdrive file (expected %i).", item_no, expected_file_size)
-    else:
-        if logger:
-            logger.debug("File no. %i does not exists at: %s", item_no, check_path)
-
-    return False
-
-
-async def check_if_file_empty(logger: logging.Logger, file_no: int, queue_item: CollectionFileQueueItem, read_tries: Optional[int] = 5) -> bool:
-    if read_tries is None:
-        read_tries = 5
-
-    file_is_empty = False
-    waiting = False
-
-    for _ in range(read_tries):
-        with open(queue_item.download_file_path) as fp:
-            try:
-                json_content = json.load(fp)
-                file_is_empty = False
-            except json.decoder.JSONDecodeError as exc:
-                if "Expecting value" in exc.msg:
-                    if not waiting:
-                        logger.debug("File is empty. Waiting with import until file %i is fully downloaded: %s", file_no, queue_item.gdrive_file_name)
-                        waiting = True
-                    file_is_empty = True
-                    await asyncio.sleep(0.2)
-                    continue
-                raise
-
-            if not json_content:
-                return True
-
-    if file_is_empty:
-        return True
-
-    return False
-
-
-def create_queues(queue_items: list[CollectionFileQueueItem]) -> tuple[list[tuple[int, CollectionFileQueueItem]], queue.Queue]:
-    download_queue_items: list[tuple[int, CollectionFileQueueItem]] = []
-    import_queue: queue.Queue = queue.Queue()
-
-    for queue_item in queue_items:
-        download_queue_items.append(queue_item)
-        import_queue.put(queue_item)
-
-    return download_queue_items, import_queue
-
-
-async def skip_file_import_on_error(logger: logging.Logger, file_no: int, queue_item: CollectionFileQueueItem) -> bool:
-    if queue_item.cancel_token.cancelled:
-        return True
-
-    if queue_item.error_while_downloading:
-        logger.warn("Error while downloading. Skipping file no. %i: %s", file_no, queue_item.gdrive_file_name)
-        return True
-
-    with open(queue_item.download_file_path, "r") as fp:
-        contents = json.load(fp)
-        if not contents:
-            logger.warn("File contains empty json. Skipping file no. %i: %s", file_no, queue_item.download_file_path)
-            return True
-
-    return False

@@ -4,7 +4,7 @@ import pydrive2.files
 import pytest
 
 from src.app.core.gdrive import GoogleDriveClient
-from src.app.importer.importer import download_gdrive_file_contents
+from src.app.importer.download_worker import download_gdrive_file_contents
 from src.app.models.cancellation_token import CancellationToken, OperationCancelledError
 
 
