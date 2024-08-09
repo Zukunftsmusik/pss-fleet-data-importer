@@ -1,6 +1,7 @@
 import asyncio
 import logging
 import sys
+from datetime import datetime  # noqa
 
 from .core import config
 from .database import db
@@ -38,14 +39,17 @@ def main():
         print()
     print("  Starting import loop.")
 
-    try:
-        # asyncio.run(importer.run_import_loop(modified_before=datetime(2019, 10, 20)))
-        # asyncio.run(importer.run_import_loop(modified_after=datetime(2021, 11, 11), modified_before=datetime(2021, 11, 12)))
-        asyncio.run(importer.run_import_loop())
-    except KeyboardInterrupt:
-        configuration.logger.warn("\nAborted by user, shutting down.")
-        importer.cancel_workers()
-        sys.exit(1)
+    if asyncio.run(importer.check_api_server_connection()):
+        try:
+            asyncio.run(importer.run_import_loop(modified_before=datetime(2019, 10, 20)))
+            # asyncio.run(importer.run_import_loop(modified_after=datetime(2021, 11, 11), modified_before=datetime(2021, 11, 12)))
+            # asyncio.run(importer.run_import_loop())
+        except KeyboardInterrupt:
+            configuration.logger.warn("\nAborted by user, shutting down.")
+            importer.cancel_workers()
+            sys.exit(1)
+    else:
+        configuration.logger.critical("Cannot connect to server at: %s", importer.api_server_url)
 
 
 if __name__ == "__main__":

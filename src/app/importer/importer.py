@@ -11,6 +11,7 @@ from pathlib import Path
 from typing import Iterable, Optional, Union
 
 import pydrive2.files
+from httpx import ConnectError
 from pss_fleet_data import PssFleetDataClient
 from pss_fleet_data.core.exceptions import ApiError, NonUniqueTimestampError
 from pydrive2.files import GoogleDriveFile
@@ -79,6 +80,13 @@ class Importer:
     def cancel_workers(self):
         self.logger.warn("Cancelling workers.")
         self.status.cancel_token.cancel()
+
+    async def check_api_server_connection(self) -> bool:
+        try:
+            await self.__fleet_data_client.ping()
+            return True
+        except ConnectError:
+            return False
 
     async def run_import_loop(self, modified_after: Optional[datetime] = None, modified_before: Optional[datetime] = None):
         while not self.status.cancel_token.cancelled:
