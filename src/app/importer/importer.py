@@ -3,7 +3,7 @@ import logging
 import queue
 import threading
 from datetime import datetime, timedelta
-from typing import Optional
+from typing import Iterable, Optional
 
 from httpx import ConnectError
 from pss_fleet_data import PssFleetDataClient
@@ -109,6 +109,21 @@ class Importer:
 
         log.downloads_imports(self.logger, queue_items)
 
+        worker_threads = self.create_worker_threads(queue_items)
+
+        for thread in worker_threads:
+            thread.start()
+
+        for thread in worker_threads:
+            thread.join()
+
+        end = utils.get_now()
+        log.bulk_import_finish(self.logger, queue_items, modified_after, modified_before)
+        print(f"### Finished bulk import of {len(queue_items)} files at: {end.isoformat()} (after: {end - start})")
+
+        return True
+
+    def create_worker_threads(self, queue_items: Iterable[CollectionFileQueueItem]) -> list[threading.Thread]:
         worker_threads = [
             threading.Thread(
                 target=download_worker.worker,
@@ -158,17 +173,7 @@ class Importer:
             ),
         ]
 
-        for thread in worker_threads:
-            thread.start()
-
-        for thread in worker_threads:
-            thread.join()
-
-        end = utils.get_now()
-        log.bulk_import_finish(self.logger, queue_items, modified_after, modified_before)
-        print(f"### Finished bulk import of {len(queue_items)} files at: {end.isoformat()} (after: {end - start})")
-
-        return True
+        return worker_threads
 
 
 def create_queues(queue_items: list[CollectionFileQueueItem]) -> tuple[list[tuple[int, CollectionFileQueueItem]], queue.Queue]:
