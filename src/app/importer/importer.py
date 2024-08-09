@@ -176,17 +176,6 @@ class Importer:
         return worker_threads
 
 
-def create_queues(queue_items: list[CollectionFileQueueItem]) -> tuple[list[tuple[int, CollectionFileQueueItem]], queue.Queue]:
-    download_queue_items: list[tuple[int, CollectionFileQueueItem]] = []
-    import_queue: queue.Queue = queue.Queue()
-
-    for queue_item in queue_items:
-        download_queue_items.append(queue_item)
-        import_queue.put(queue_item)
-
-    return download_queue_items, import_queue
-
-
 def get_gdrive_file_list(
     gdrive_client: GoogleDriveClient,
     logger: logging.Logger,
