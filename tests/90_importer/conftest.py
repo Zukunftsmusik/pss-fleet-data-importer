@@ -1,7 +1,9 @@
 import pytest
 from pydrive2.files import GoogleDriveFile
 
+from src.app.core import config
 from src.app.core.gdrive import GoogleDriveClient
+from src.app.importer import Importer
 
 
 class MockGoogleDriveClient(GoogleDriveClient):
@@ -40,3 +42,8 @@ def patch_gdrive_client_get_file_contents(gdrive_file_contents: str, monkeypatch
         return gdrive_file_contents
 
     monkeypatch.setattr(GoogleDriveClient, GoogleDriveClient.get_file_contents.__name__, mock_gdrive_client_get_file_contents)
+
+
+@pytest.fixture(scope="function")
+def importer(configuration: config.Config) -> Importer:
+    return Importer(configuration, None, None, None)
