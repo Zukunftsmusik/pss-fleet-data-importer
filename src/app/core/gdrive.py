@@ -54,18 +54,6 @@ class GoogleDriveClient:
     def get_file_contents(self, file: pydrive2.files.GoogleDriveFile) -> str:
         return get_file_contents(file, self.logger)
 
-    def list_all_files(self) -> Generator[pydrive2.files.GoogleDriveFile, None, None]:
-        self.__ensure_initialized()
-
-        params = {
-            "orderBy": "createdDate",
-            "q": self.__base_criteria,
-        }
-        file_list = self.__drive.ListFile(param=params).GetList()
-
-        for file in file_list:
-            yield file
-
     def list_files_by_modified_date(
         self, modified_after: Optional[datetime] = None, modified_before: Optional[datetime] = None
     ) -> Generator[pydrive2.files.GoogleDriveFile, None, None]:

@@ -184,9 +184,5 @@ def get_gdrive_file_list(
 ) -> list[GoogleDriveFile]:
     log.gdrive_file_list_params(logger, modified_after, modified_before)
 
-    if modified_after or modified_before:
-        gdrive_files = list(gdrive_client.list_files_by_modified_date(modified_after=modified_after, modified_before=modified_before))
-    else:
-        gdrive_files = list(gdrive_client.list_all_files())
-
+    gdrive_files = list(gdrive_client.list_files_by_modified_date(modified_after=modified_after, modified_before=modified_before))
     return gdrive_files
