@@ -4,8 +4,9 @@ import pydrive2.files
 import pytest
 
 from src.app.core.gdrive import GoogleDriveClient
+from src.app.core.models.exceptions import OperationCancelledError
 from src.app.importer.download_worker import download_gdrive_file_contents
-from src.app.models.cancellation_token import CancellationToken, OperationCancelledError
+from src.app.models import CancellationToken
 
 
 @pytest.mark.usefixtures("patch_time_sleep")

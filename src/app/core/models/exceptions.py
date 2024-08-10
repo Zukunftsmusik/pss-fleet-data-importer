@@ -25,6 +25,12 @@ class DownloadFailedError(ImporterBaseError):
         return f"<{DownloadFailedError.__name__} file_name={self.file_name}, reason={self.reason}, inner_exception={type(self.inner_exception)}>"
 
 
+class OperationCancelledError(Exception):
+    pass
+
+
 __all__ = [
     DownloadFailedError.__name__,
+    ImporterBaseError.__name__,
+    OperationCancelledError.__name__,
 ]

@@ -3,9 +3,7 @@ from typing import Any
 
 from cancel_token import CancellationToken as CT
 
-
-class OperationCancelledError(Exception):
-    pass
+from .exceptions import OperationCancelledError
 
 
 class CancellationToken(CT):
@@ -37,5 +35,4 @@ class CancellationToken(CT):
 
 __all__ = [
     CancellationToken.__name__,
-    OperationCancelledError.__name__,
 ]

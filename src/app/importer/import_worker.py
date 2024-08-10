@@ -8,11 +8,8 @@ from pss_fleet_data import PssFleetDataClient
 from pss_fleet_data.core.exceptions import ApiError, NonUniqueTimestampError
 
 from ..core import utils
-from ..models.cancellation_token import CancellationToken
-from ..models.collection_file_change import CollectionFileChange
-from ..models.queue_item import CollectionFileQueueItem
-from ..models.status import StatusFlag
-from . import log
+from ..log.log_importer import importer as log
+from ..models import CancellationToken, CollectionFileChange, CollectionFileQueueItem, StatusFlag
 
 
 async def worker(

@@ -14,3 +14,9 @@ class RemoveSrcFromLoggerNameFilter(logging.Filter):
             return_name_from = len(self.remove_str)
             record.name = record.name[return_name_from:]
         return record
+
+
+__all__ = [
+    OnlyDebugInfoFilter.__name__,
+    RemoveSrcFromLoggerNameFilter.__name__,
+]

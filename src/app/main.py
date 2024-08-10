@@ -9,11 +9,12 @@ from .core import config
 from .core.gdrive import GoogleDriveClient
 from .database import db
 from .importer import Importer
+from .log import base as logger_base
 
 
 async def main():
     configuration = config.get_config()
-    configuration.configure_logging(config.get_logging_base_config(configuration))
+    configuration.configure_logging(logger_base.get_logging_base_config(configuration))
 
     print()
     print("  ===========================")

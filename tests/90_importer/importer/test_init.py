@@ -3,7 +3,7 @@ import queue
 
 from src.app.core.config import Config
 from src.app.importer import Importer
-from src.app.models.status import ImportStatus
+from src.app.models import ImportStatus
 
 
 def test_init(configuration: Config):

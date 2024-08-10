@@ -7,7 +7,7 @@ import pydrive2.files
 import pytest
 
 from src.app.core import config
-from src.app.models.cancellation_token import CancellationToken
+from src.app.models import CancellationToken
 
 
 class MockHttpResponse:

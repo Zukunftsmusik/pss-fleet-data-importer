@@ -1,6 +1,7 @@
 import pytest
 
-from src.app.models.cancellation_token import CancellationToken, OperationCancelledError
+from src.app.core.models.exceptions import OperationCancelledError
+from src.app.models import CancellationToken
 
 
 def test_cancelled(cancel_token: CancellationToken):

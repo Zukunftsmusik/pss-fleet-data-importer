@@ -7,8 +7,8 @@ from typing import Any, Awaitable, Callable, Iterable, Mapping, Optional, Union
 
 from pydrive2.files import GoogleDriveFile
 
-from ..models.cancellation_token import CancellationToken
-from ..models.status import StatusFlag
+from .models.cancellation_token import CancellationToken
+from .models.status import StatusFlag
 
 
 def extract_timestamp_from_gdrive_file_name(file_name: str) -> datetime:

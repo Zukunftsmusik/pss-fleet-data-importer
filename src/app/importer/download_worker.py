@@ -12,12 +12,9 @@ from pydrive2.files import GoogleDriveFile
 
 from ..core import utils
 from ..core.gdrive import GoogleDriveClient
-from ..models.cancellation_token import CancellationToken, OperationCancelledError
-from ..models.collection_file_change import CollectionFileChange
-from ..models.exceptions import DownloadFailedError
-from ..models.queue_item import CollectionFileQueueItem
-from ..models.status import StatusFlag
-from . import log
+from ..core.models.exceptions import DownloadFailedError, OperationCancelledError
+from ..log.log_importer import importer as log
+from ..models import CancellationToken, CollectionFileChange, CollectionFileQueueItem, StatusFlag
 from . import utils as importer_utils
 
 

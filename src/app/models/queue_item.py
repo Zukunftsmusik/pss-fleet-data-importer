@@ -7,11 +7,11 @@ import dateutil.parser
 from pydrive2.files import GoogleDriveFile
 
 from ..core import utils
+from ..core.models.cancellation_token import CancellationToken
+from ..core.models.collection_file_change import CollectionFileChange
 from ..database import crud
 from ..database.db import AsyncAutoRollbackSession, Database
 from ..database.models import CollectionFileDB
-from .cancellation_token import CancellationToken
-from .collection_file_change import CollectionFileChange
 
 
 class CollectionFileQueueItem:

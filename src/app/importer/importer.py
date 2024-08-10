@@ -9,14 +9,14 @@ from httpx import ConnectError
 from pss_fleet_data import PssFleetDataClient
 from pydrive2.files import GoogleDriveFile
 
+from ..converters import FromCollectionFileDB, FromGdriveFile
 from ..core import utils, wrapper
 from ..core.config import Config
 from ..core.gdrive import GoogleDriveClient
 from ..database import AsyncAutoRollbackSession, Database, crud
-from ..models.converters import FromCollectionFileDB, FromGdriveFile
-from ..models.queue_item import CollectionFileQueueItem
-from ..models.status import ImportStatus
-from . import database_worker, download_worker, import_worker, log
+from ..log.log_importer import importer as log
+from ..models import CollectionFileQueueItem, ImportStatus
+from . import database_worker, download_worker, import_worker
 
 
 class Importer:

@@ -2,7 +2,7 @@ import logging
 
 import pytest
 
-from src.app.models.cancellation_token import CancellationToken
+from src.app.models import CancellationToken
 
 
 test_cases_not_cancelled = [

@@ -3,11 +3,8 @@ import logging
 import queue
 
 from ..database import Database
-from ..models.cancellation_token import CancellationToken
-from ..models.collection_file_change import CollectionFileChange
-from ..models.queue_item import CollectionFileQueueItem
-from ..models.status import StatusFlag
-from . import log
+from ..log.log_importer import database_worker as log
+from ..models import CancellationToken, CollectionFileChange, CollectionFileQueueItem, StatusFlag
 
 
 async def worker(
