@@ -84,10 +84,7 @@ class Importer:
 
         log.bulk_import_start(self.logger, modified_after, modified_before)
 
-        self.logger.debug("Downloading Google Drive file list.")
-        gdrive_files = self.gdrive_client.list_files_by_modified_date(modified_after, modified_before)
-        gdrive_files = wrapper.debug_log_running_time(self.logger, "Downloading file list")(list, gdrive_files)
-
+        gdrive_files = get_gdrive_file_list(self.gdrive_client, self.logger, modified_after=modified_after, modified_before=modified_before)
         if not gdrive_files:
             self.logger.info("No new files found to be imported.")
             return False
@@ -182,7 +179,9 @@ def get_gdrive_file_list(
     modified_after: Optional[datetime] = None,
     modified_before: Optional[datetime] = None,
 ) -> list[GoogleDriveFile]:
-    log.gdrive_file_list_params(logger, modified_after, modified_before)
+    logger.debug("Downloading Google Drive file list.")
 
-    gdrive_files = list(gdrive_client.list_files_by_modified_date(modified_after=modified_after, modified_before=modified_before))
+    gdrive_files = gdrive_client.list_files_by_modified_date(modified_after, modified_before)
+    gdrive_files = wrapper.debug_log_running_time(logger, "Downloading file list")(list, gdrive_files)
+
     return gdrive_files
