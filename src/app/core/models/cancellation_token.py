@@ -4,7 +4,10 @@ from typing import Any, Optional
 from cancel_token import CancellationToken as CT
 
 from ...log.log_core import cancellation_token as log
-from .exceptions import OperationCancelledError
+
+
+class OperationCancelledError(Exception):
+    pass
 
 
 class CancellationToken(CT):
@@ -33,5 +36,7 @@ class CancellationToken(CT):
 
 
 __all__ = [
+    # Classes
     CancellationToken.__name__,
+    OperationCancelledError.__name__,
 ]

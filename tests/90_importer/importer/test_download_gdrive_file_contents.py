@@ -5,7 +5,7 @@ import pytest
 
 from mock_classes import MockGDriveFile, MockGoogleDriveClient
 from src.app.core.gdrive import GoogleDriveClient
-from src.app.core.models.exceptions import OperationCancelledError
+from src.app.core.models.cancellation_token import OperationCancelledError
 from src.app.importer.download_worker import download_gdrive_file_contents
 from src.app.models import CancellationToken
 

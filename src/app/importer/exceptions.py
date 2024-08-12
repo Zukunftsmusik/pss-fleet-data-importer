@@ -1,17 +1,6 @@
 from typing import Optional
 
-
-class ImporterBaseError(Exception):
-    def __init__(self, message: str, inner_exception: Optional[Exception] = None):
-        self.inner_exception: Optional[Exception] = inner_exception
-        self.message: str = message
-        super().__init__(self.message)
-
-    def __str__(self) -> str:
-        return self.message
-
-    def __repr__(self) -> str:
-        return f"<{ImporterBaseError.__name__} message={self.message}, inner_exception={type(self.inner_exception)}>"
+from ..core.models.base_error import ImporterBaseError
 
 
 class DownloadFailedError(ImporterBaseError):
@@ -25,12 +14,6 @@ class DownloadFailedError(ImporterBaseError):
         return f"<{DownloadFailedError.__name__} file_name={self.file_name}, reason={self.reason}, inner_exception={type(self.inner_exception)}>"
 
 
-class OperationCancelledError(Exception):
-    pass
-
-
 __all__ = [
     DownloadFailedError.__name__,
-    ImporterBaseError.__name__,
-    OperationCancelledError.__name__,
 ]
