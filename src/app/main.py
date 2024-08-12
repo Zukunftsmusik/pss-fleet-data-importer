@@ -23,7 +23,7 @@ async def main():
     print("  ===========================")
     print()
     print(f"  Version: {__version__}")
-    print(f"  Log level: {logging.getLevelName(configuration.log_level)}")
+    print(f"  Log level: {logging.getLevelName(configuration.app_log_level)}")
     print(f"  Debug mode: {configuration.debug_mode}")
     print(f"  API server URL: {configuration.api_default_server_url}")
     print(f"  Google Drive folder ID: {configuration.gdrive_folder_id}")
@@ -55,7 +55,7 @@ async def main():
         pss_fleet_data_client,
     )
 
-    if configuration.log_level <= logging.INFO:
+    if configuration.app_log_level <= logging.INFO:
         print()
     print("  Starting import loop.")
 

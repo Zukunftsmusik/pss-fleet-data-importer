@@ -85,7 +85,7 @@ def get_logging_base_config(config: Config):
         "loggers": {
             "importer": {
                 "handlers": ["stderr", "log_file"] if config.log_file_path else ["stderr"],
-                "level": config.log_level,
+                "level": config.app_log_level,
                 "propagate": False,
             },
             "": {  # root logger
@@ -104,7 +104,7 @@ def get_logging_base_config(config: Config):
             },
             "alembic": {
                 "handlers": ["alembic_console"],
-                "level": max(logging.INFO, config.log_level),
+                "level": max(logging.INFO, config.app_log_level),
                 "propagate": False,
             },
         },

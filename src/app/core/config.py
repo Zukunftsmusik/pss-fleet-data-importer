@@ -4,17 +4,18 @@ import os
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Optional
+from typing import Optional, dataclass_transform
 
 
-@dataclass(frozen=True)
-class Config:
+@dataclass_transform()
+class ConfigBase:
     # Basic settings
     pss_start_date: datetime = datetime(2016, 1, 6, tzinfo=timezone.utc)
     earliest_data_date: datetime = datetime(2019, 10, 10, tzinfo=timezone.utc)
     temp_download_folder: Path = Path("./downloads")
     download_thread_pool_size: int = int(os.getenv("FLEET_DATA_IMPORTER_WORKER_COUNT", 2))
     log_folder: Optional[str] = os.getenv("LOG_FOLDER_PATH")
+    log_level: Optional[str] = os.getenv("LOG_LEVEL")
 
     # PSS Fleet Data API
     api_default_server_url: str = os.getenv("FLEET_DATA_API_URL", "https://fleetdata.dolores2.xyz")
@@ -43,6 +44,19 @@ class Config:
     db_url: str = os.getenv("DATABASE_URL")
 
     @property
+    def app_log_level(self) -> int:
+        log_level = None
+        if self.log_level:
+            log_level = logging.getLevelNamesMapping().get(self.log_level)
+            if log_level:
+                return log_level
+
+        if self.debug_mode:
+            return logging.DEBUG
+
+        return logging.INFO
+
+    @property
     def db_async_connection_str(self) -> str:
         return f"postgresql+asyncpg://{self.db_url}/{self.db_name}"
 
@@ -55,7 +69,7 @@ class Config:
         return self.db_url.split("@")[1]
 
     @property
-    def log_file_name(self) -> Optional[Path]:
+    def log_file_name(self) -> Optional[str]:
         return "pss_fleet_data_importer_" + datetime.now(tz=timezone.utc).strftime("%Y%m%d-%H%M%S") + ".log"
 
     @property
@@ -70,16 +84,10 @@ class Config:
             return Path(self.log_folder)
         return None
 
-    @property
-    def log_level(self) -> int:
-        from_env = os.getenv("LOG_LEVEL")
-        if from_env:
-            return logging.getLevelNamesMapping().get(from_env, "INFO")
 
-        if self.debug_mode:
-            return logging.DEBUG
-
-        return logging.INFO
+@dataclass(frozen=True)
+class Config(ConfigBase):
+    pass
 
 
 class ConfigRepository:
