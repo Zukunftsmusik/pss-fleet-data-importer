@@ -8,7 +8,7 @@ class ImporterBaseError(Exception):
         super().__init__(self.message)
 
     def __str__(self) -> str:
-        return self.message
+        return f"{type(self).__name__}: {self.message}"
 
     def __repr__(self) -> str:
         return f"<{ImporterBaseError.__name__} message={self.message}, inner_exception={type(self.inner_exception)}>"
