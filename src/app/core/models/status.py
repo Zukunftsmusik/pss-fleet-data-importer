@@ -12,9 +12,6 @@ class StatusFlag:
     def __bool__(self) -> bool:
         return self.value
 
-    def __nonzero__(self) -> bool:
-        return self.value
-
     @property
     def value(self) -> bool:
         with self.__lock:
