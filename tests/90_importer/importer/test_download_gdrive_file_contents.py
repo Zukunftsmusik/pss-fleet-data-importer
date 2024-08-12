@@ -15,13 +15,12 @@ def test_returns_contents(
     gdrive_file: pydrive2.files.GoogleDriveFile,
     mock_gdrive_client: GoogleDriveClient,
     cancel_token: CancellationToken,
-    logger: logging.Logger,
     caplog: pytest.LogCaptureFixture,
     gdrive_file_contents: str,
 ):
     for max_download_attempts in range(1, 6):
         with caplog.at_level(logging.WARN):
-            contents = download_gdrive_file_contents(gdrive_file, mock_gdrive_client, cancel_token, 1, max_download_attempts, False, logger)
+            contents = download_gdrive_file_contents(gdrive_file, mock_gdrive_client, cancel_token, 1, max_download_attempts, False)
         assert contents == gdrive_file_contents
         assert not caplog.text
         caplog.clear()
@@ -41,7 +40,6 @@ def test_raised_error_caught(
     gdrive_file: pydrive2.files.GoogleDriveFile,
     mock_gdrive_client: GoogleDriveClient,
     cancel_token: CancellationToken,
-    logger: logging.Logger,
     google_api_errors: dict[type[Exception], Exception],
     exception_type: type[Exception],
     caplog: pytest.LogCaptureFixture,
@@ -57,7 +55,7 @@ def test_raised_error_caught(
     for max_download_attempts in range(1, 6):
         with caplog.at_level(logging.WARN):
             with pytest.raises(exception_type):
-                _ = download_gdrive_file_contents(gdrive_file, mock_gdrive_client, cancel_token, item_no, max_download_attempts, False, logger)
+                _ = download_gdrive_file_contents(gdrive_file, mock_gdrive_client, cancel_token, item_no, max_download_attempts, False)
         assert caplog.text
         assert str(item_no) in caplog.text
         caplog.clear()
@@ -80,7 +78,6 @@ def test_raised_error_not_caught(
     gdrive_file: pydrive2.files.GoogleDriveFile,
     mock_gdrive_client: GoogleDriveClient,
     cancel_token: CancellationToken,
-    logger: logging.Logger,
     exception_type: type[Exception],
     caplog: pytest.LogCaptureFixture,
     monkeypatch: pytest.MonkeyPatch,
@@ -95,7 +92,7 @@ def test_raised_error_not_caught(
     for max_download_attempts in range(1, 6):
         with caplog.at_level(logging.WARN):
             with pytest.raises(exception_type):
-                _ = download_gdrive_file_contents(gdrive_file, mock_gdrive_client, cancel_token, item_no, max_download_attempts, False, logger)
+                _ = download_gdrive_file_contents(gdrive_file, mock_gdrive_client, cancel_token, item_no, max_download_attempts, False)
         assert not caplog.text
         caplog.clear()
 
@@ -105,7 +102,6 @@ def test_cancelled(
     gdrive_file: pydrive2.files.GoogleDriveFile,
     mock_gdrive_client: GoogleDriveClient,
     cancel_token: CancellationToken,
-    logger: logging.Logger,
     caplog: pytest.LogCaptureFixture,
 ):
     cancel_token.cancel()
@@ -114,6 +110,6 @@ def test_cancelled(
     for max_download_attempts in range(1, 6):
         with caplog.at_level(logging.WARN):
             with pytest.raises(OperationCancelledError):
-                _ = download_gdrive_file_contents(gdrive_file, mock_gdrive_client, cancel_token, item_no, max_download_attempts, False, logger)
+                _ = download_gdrive_file_contents(gdrive_file, mock_gdrive_client, cancel_token, item_no, max_download_attempts, False)
         assert not caplog.text
         caplog.clear()

@@ -10,7 +10,8 @@ from ..core import utils
 from ..core.models.cancellation_token import CancellationToken
 from ..core.models.collection_file_change import CollectionFileChange
 from ..database import crud
-from ..database.db import AsyncAutoRollbackSession, Database
+from ..database.async_auto_rollback_session import AsyncAutoRollbackSession
+from ..database.db import Database
 from ..database.models import CollectionFileDB
 
 

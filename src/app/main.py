@@ -13,8 +13,8 @@ from .log import base as logger_base
 
 
 async def main():
-    configuration = config.get_config()
-    configuration.configure_logging(logger_base.get_logging_base_config(configuration))
+    configuration = config.ConfigRepository.get_config()
+    logger_base.configure_logging_from_app_config(configuration)
 
     print()
     print("  ===========================")
@@ -30,7 +30,7 @@ async def main():
     print(f"  Download thread pool size: {configuration.download_thread_pool_size}")
     print()
 
-    database = db.get_db()
+    database = db.DatabaseRepository.get_db()
 
     gdrive_client = GoogleDriveClient(
         configuration.gdrive_project_id,
@@ -42,7 +42,6 @@ async def main():
         configuration.gdrive_folder_id,
         configuration.gdrive_service_account_file_path,
         configuration.gdrive_settings_file_path,
-        logger=configuration.logger,
     )
     gdrive_client.initialize()
 
@@ -65,11 +64,11 @@ async def main():
             # asyncio.run(importer.run_import_loop(modified_after=datetime(2021, 11, 11), modified_before=datetime(2021, 11, 12)))
             # asyncio.run(importer.run_import_loop())
         except KeyboardInterrupt:
-            configuration.logger.warn("\nAborted by user, shutting down.")
+            logger_base.aborted()
             importer.cancel_workers()
             sys.exit(1)
     else:
-        configuration.logger.critical("Cannot connect to server at: %s", pss_fleet_data_client.base_url)
+        logger_base.connection_failure(pss_fleet_data_client.base_url)
 
 
 if __name__ == "__main__":

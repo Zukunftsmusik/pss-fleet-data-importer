@@ -36,14 +36,13 @@ def test_capture_logs(
     log_message: str,
     log_level: int,
     capture_log_level: int,
-    logger: logging.Logger,
     caplog: pytest.LogCaptureFixture,
 ):
     token = CancellationToken()
     token.cancel()
 
     with caplog.at_level(capture_log_level):
-        cancelled = token.log_if_cancelled(logger, log_message, log_level=log_level)
+        cancelled = token.log_if_cancelled(log_message, log_level=log_level)
     assert cancelled is True
     assert log_message in caplog.text
 
@@ -52,14 +51,13 @@ def test_capture_logs(
 def test_capture_no_logs(
     log_level: int,
     capture_log_level: int,
-    logger: logging.Logger,
     caplog: pytest.LogCaptureFixture,
 ):
     token = CancellationToken()
     token.cancel()
 
     with caplog.at_level(capture_log_level):
-        cancelled = token.log_if_cancelled(logger, "log_message", log_level=log_level)
+        cancelled = token.log_if_cancelled("log_message", log_level=log_level)
     assert cancelled is True
     assert not caplog.text
 
@@ -68,12 +66,11 @@ def test_capture_no_logs(
 def test_not_cancelled(
     log_level: int,
     capture_log_level: int,
-    logger: logging.Logger,
     caplog: pytest.LogCaptureFixture,
 ):
     token = CancellationToken()
 
     with caplog.at_level(capture_log_level):
-        cancelled = token.log_if_cancelled(logger, "log_message", log_level=log_level)
+        cancelled = token.log_if_cancelled("log_message", log_level=log_level)
     assert cancelled is False
     assert not caplog.text

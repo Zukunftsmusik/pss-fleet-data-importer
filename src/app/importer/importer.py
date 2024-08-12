@@ -1,5 +1,4 @@
 import asyncio
-import logging
 import queue
 import threading
 from datetime import datetime, timedelta
@@ -10,7 +9,7 @@ from pss_fleet_data import PssFleetDataClient
 from pydrive2.files import GoogleDriveFile
 
 from ..converters import FromCollectionFileDB, FromGdriveFile
-from ..core import utils, wrapper
+from ..core import utils
 from ..core.config import Config
 from ..core.gdrive import GoogleDriveClient
 from ..database import AsyncAutoRollbackSession, Database, crud
@@ -32,14 +31,13 @@ class Importer:
         self.gdrive_client: GoogleDriveClient = gdrive_client
         self.fleet_data_client: PssFleetDataClient = pss_fleet_data_client
 
-        self.logger: logging.Logger = self.config.logger.getChild(Importer.__name__)
         self.status = ImportStatus()
 
         self.import_queue: queue.Queue = queue.Queue()
         self.database_queue: queue.Queue = queue.Queue()
 
     def cancel_workers(self):
-        self.logger.warn("Cancelling workers.")
+        log.workers_cancel()
         self.status.cancel_token.cancel()
 
     async def check_api_server_connection(self) -> bool:
@@ -52,7 +50,7 @@ class Importer:
     async def run_import_loop(self, modified_after: Optional[datetime] = None, modified_before: Optional[datetime] = None):
         cancel_message = "Import cancelled. Exiting import loop."
         while True:
-            if self.status.cancel_token.log_if_cancelled(self.logger, cancel_message):
+            if self.status.cancel_token.log_if_cancelled(cancel_message):
                 break
 
             after = modified_after
@@ -61,50 +59,46 @@ class Importer:
                     earliest_not_imported_modified_date = await crud.get_earliest_gdrive_modified_date(session)
                     after = utils.get_next_full_hour(earliest_not_imported_modified_date) if earliest_not_imported_modified_date else None
 
-            if self.status.cancel_token.log_if_cancelled(self.logger, cancel_message):
+            if self.status.cancel_token.log_if_cancelled(cancel_message):
                 break
 
             did_import = await self.run_bulk_import(modified_after=after, modified_before=modified_before)
 
-            if self.status.cancel_token.log_if_cancelled(self.logger, cancel_message):
+            if self.status.cancel_token.log_if_cancelled(cancel_message):
                 break
 
             if did_import:
                 continue
 
-            now = utils.get_now()
-            wait_until = utils.get_next_full_hour(now) + timedelta(minutes=1)
-            wait_for_seconds = (wait_until - now).total_seconds()
-            self.logger.info("Waiting for %.2f seconds until next import run at %s.", wait_for_seconds, wait_until.isoformat())
-            await asyncio.sleep(wait_for_seconds)
+            await wait_for_import()
 
     async def run_bulk_import(self, modified_after: Optional[datetime] = None, modified_before: Optional[datetime] = None) -> bool:
         start = utils.get_now()
         print(f"### Starting bulk import at: {start.isoformat()}")
 
-        log.bulk_import_start(self.logger, modified_after, modified_before)
+        log.bulk_import_start(modified_after, modified_before)
 
-        gdrive_files = get_gdrive_file_list(self.gdrive_client, self.logger, modified_after=modified_after, modified_before=modified_before)
+        log.download_gdrive_file_list_params(modified_after=modified_after, modified_before=modified_before)
+        gdrive_files = get_gdrive_file_list(self.gdrive_client, modified_after=modified_after, modified_before=modified_before)
+
+        log.download_gdrive_file_list_length(len(gdrive_files))
         if not gdrive_files:
-            self.logger.info("No new files found to be imported.")
             return False
-
-        self.logger.info(f"Found {len(gdrive_files)} new gdrive files to be imported.")
 
         collection_files = [FromGdriveFile.to_collection_file(gdrive_file) for gdrive_file in gdrive_files]
         collection_files.sort(key=lambda file: file.file_name.replace("-", "_"))  # There're files where some underscores are hyphens.
 
-        self.logger.debug("Creating database entries.")
+        log.database_entries_create()
         async with AsyncAutoRollbackSession(self.database) as session:
             collection_files = await crud.insert_new_collection_files(session, collection_files)
 
-        self.logger.debug("Creating queue items.")
+        log.queue_items_create()
         queue_items = FromCollectionFileDB.to_queue_items(gdrive_files, collection_files, self.config.temp_download_folder, self.status.cancel_token)
 
-        self.logger.debug("Ensuring that download path '%s' exists.", self.config.temp_download_folder)
+        log.download_folder_create(self.config.temp_download_folder)
         self.config.temp_download_folder.mkdir(parents=True, exist_ok=True)
 
-        log.downloads_imports(self.logger, queue_items)
+        log.downloads_imports_count(queue_items)
 
         worker_threads = self.create_worker_threads(queue_items)
 
@@ -115,7 +109,7 @@ class Importer:
             thread.join()
 
         end = utils.get_now()
-        log.bulk_import_finish(self.logger, queue_items, modified_after, modified_before)
+        log.bulk_import_finish(queue_items, modified_after, modified_before)
         print(f"### Finished bulk import of {len(queue_items)} files at: {end.isoformat()} (after: {end - start})")
 
         return True
@@ -136,7 +130,6 @@ class Importer:
                     self.status.download_worker_timed_out,
                     self.status.cancel_token,
                     self.config.debug_mode,
-                    self.logger,
                 ],
                 daemon=True,
             ),
@@ -148,7 +141,6 @@ class Importer:
                     self.database_queue,
                     self.fleet_data_client,
                     self.status.bulk_import_running,
-                    self.logger,
                     self.status.cancel_token,
                     1,
                     self.config.keep_downloaded_files,
@@ -161,7 +153,6 @@ class Importer:
                 args=(
                     self.database,
                     self.database_queue,
-                    self.logger,
                     self.status.bulk_database_running,
                     self.status.cancel_token,
                     2,
@@ -175,13 +166,20 @@ class Importer:
 
 def get_gdrive_file_list(
     gdrive_client: GoogleDriveClient,
-    logger: logging.Logger,
     modified_after: Optional[datetime] = None,
     modified_before: Optional[datetime] = None,
 ) -> list[GoogleDriveFile]:
-    logger.debug("Downloading Google Drive file list.")
+    log.download_gdrive_file_list_start()
 
-    gdrive_files = gdrive_client.list_files_by_modified_date(modified_after, modified_before)
-    gdrive_files = wrapper.debug_log_running_time(logger, "Downloading file list")(list, gdrive_files)
+    with log.download_gdrive_file_list_duration():
+        gdrive_files = list(gdrive_client.list_files_by_modified_date(modified_after, modified_before))
 
     return gdrive_files
+
+
+async def wait_for_import():
+    now = utils.get_now()
+    wait_until = utils.get_next_full_hour(now) + timedelta(minutes=1)
+    wait_for_seconds = (wait_until - utils.get_now()).total_seconds()
+    log.wait_for_import(wait_for_seconds, wait_until)
+    await asyncio.sleep(wait_for_seconds)

@@ -4,14 +4,14 @@ from alembic import context
 from sqlalchemy import engine_from_config, pool
 from sqlmodel import SQLModel
 
-from src.app.core.config import get_config
+from src.app.core.config import ConfigRepository
 from src.app.database.models import CollectionFileDB  # noqa: F401
 
 
 # this is the Alembic Config object, which provides
 # access to the values within the .ini file in use.
 config = context.config
-config.attributes["sqlalchemy.url"] = get_config().db_sync_connection_str  # Acquire connection string during runtime
+config.attributes["sqlalchemy.url"] = ConfigRepository.get_config().db_sync_connection_str  # Acquire connection string during runtime
 
 # Interpret the config file for Python logging.
 # This line sets up loggers basically.
@@ -66,7 +66,7 @@ def run_migrations_online() -> None:
         config.attributes,
         prefix="sqlalchemy.",
         poolclass=pool.NullPool,
-        echo=get_config().db_engine_echo,
+        echo=ConfigRepository.get_config().db_engine_echo,
     )
 
     with connectable.connect() as connection:

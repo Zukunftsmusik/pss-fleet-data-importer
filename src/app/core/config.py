@@ -1,15 +1,10 @@
 import logging
 import logging.config
 import os
-import time
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Optional
-
-
-def get_config() -> "Config":
-    return __CONFIG
 
 
 @dataclass(frozen=True)
@@ -88,27 +83,19 @@ class Config:
 
         return logging.INFO
 
-    @property
-    def logger(self) -> logging.Logger:
-        result = logging.getLogger(self.app_name)
-        result.setLevel(self.log_level)
-        return result
 
-    def configure_logging(self, logging_config: dict):
-        logging_config = logging_config
-        logging_config = dict(logging_config)
-        logging.config.dictConfig(logging_config)
-        logging.Formatter.converter = time.gmtime
+class ConfigRepository:
+    __config: Config = None
 
-
-__CONFIG = Config()
-if __CONFIG.log_folder_path:
-    __CONFIG.log_folder_path.mkdir(parents=True, exist_ok=True)
+    @classmethod
+    def get_config(cls) -> Config:
+        if not cls.__config:
+            cls.__config = Config()
+        return cls.__config
 
 
 __all__ = [
     # Classes
     Config.__name__,
-    # Functions
-    get_config.__name__,
+    ConfigRepository.__name__,
 ]

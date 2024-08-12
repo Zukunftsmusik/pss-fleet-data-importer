@@ -1,5 +1,4 @@
 import json
-import logging
 import urllib.parse
 from datetime import datetime
 from pathlib import Path
@@ -11,6 +10,7 @@ import pydrive2.files
 import yaml
 from pydrive2.files import GoogleDriveFile, GoogleDriveFileList
 
+from ..log.log_core import gdrive as log
 from . import utils
 
 
@@ -26,11 +26,8 @@ class GoogleDriveClient:
         folder_id: str,
         service_account_file_path: str,
         settings_file_path: str,
-        logger: Optional[logging.Logger] = None,
     ) -> None:
-        self.__logger = logger.getChild(GoogleDriveClient.__name__) if logger else logging.getLogger(GoogleDriveClient.__name__)
-
-        self.logger.info(f"Creating {GoogleDriveClient.__name__}")
+        log.client_creating()
 
         self.__client_email: str = client_email
         self.__client_id: str = client_id
@@ -47,12 +44,8 @@ class GoogleDriveClient:
         self.__gauth: pydrive2.auth.GoogleAuth = None
         self.__drive: pydrive2.drive.GoogleDrive = None
 
-    @property
-    def logger(self) -> logging.Logger:
-        return self.__logger
-
     def get_file_contents(self, file: pydrive2.files.GoogleDriveFile) -> str:
-        return get_file_contents(file, self.logger)
+        return get_file_contents(file)
 
     def list_files_by_modified_date(
         self, modified_after: Optional[datetime] = None, modified_before: Optional[datetime] = None
@@ -86,7 +79,7 @@ class GoogleDriveClient:
     def initialize(self) -> None:
         service_account_file = Path(self.__service_account_file_path)
         if service_account_file.exists() and not utils.is_empty_file(service_account_file):
-            self.logger.info(f"Using existing Service Account Credentials file: {service_account_file.absolute()}")
+            log.credentials_json_exists(service_account_file)
         else:
             GoogleDriveClient.create_service_account_credential_json(
                 self.__project_id,
@@ -96,18 +89,18 @@ class GoogleDriveClient:
                 self.__client_id,
                 self.__service_account_file_path,
             )
-            self.logger.info(f"Created Service Account Credentials file: {service_account_file.absolute()}")
+            log.credentials_json_created(service_account_file)
 
         settings_file = Path(self.__settings_file_path)
         if settings_file.exists() and not utils.is_empty_file(settings_file):
-            self.logger.info(f"Using existing Settings file: {settings_file.absolute()}")
+            log.settings_yaml_exists(settings_file)
         else:
             GoogleDriveClient.create_service_account_settings_yaml(
                 self.__settings_file_path,
                 self.__service_account_file_path,
                 self.__scopes,
             )
-            self.logger.info(f"Created Settings file: {settings_file.absolute()}")
+            log.settings_yaml_created(settings_file)
 
         self.__gauth = pydrive2.auth.GoogleAuth(settings_file=settings_file.absolute())
         credentials = pydrive2.auth.ServiceAccountCredentials.from_json_keyfile_name(
@@ -160,15 +153,14 @@ class GoogleDriveClient:
             yaml.dump(contents, fp)
 
 
-def get_file_contents(file: pydrive2.files.GoogleDriveFile, logger: logging.Logger) -> str:
+def get_file_contents(file: pydrive2.files.GoogleDriveFile) -> str:
     file_name = utils.get_gdrive_file_name(file)
 
     try:
-        logger.debug("Downloading file: %s", file_name)
-        result = file.GetContentString()
-        logger.debug("Downloaded file: %s", file_name)
+        with log.download_file(file_name):
+            result = file.GetContentString()
     except (pydrive2.files.ApiRequestError, pydrive2.files.FileNotDownloadableError) as exc:
-        logger.warn("An error occured while downloading file '%s': %s", file_name, exc)
+        log.download_file_error(file_name, exc)
         raise exc
 
     return result

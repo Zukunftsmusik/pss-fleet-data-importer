@@ -1,4 +1,3 @@
-import logging
 import queue
 
 from src.app.core.config import Config
@@ -21,6 +20,3 @@ def test_init(configuration: Config):
     assert isinstance(importer.status, ImportStatus)
     assert isinstance(importer.import_queue, queue.Queue)
     assert isinstance(importer.database_queue, queue.Queue)
-    assert isinstance(importer.logger, logging.Logger)
-    assert id(importer.logger) != id(configuration.logger)
-    assert id(importer.logger.parent) == id(configuration.logger)

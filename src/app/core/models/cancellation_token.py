@@ -1,34 +1,33 @@
 import logging
-from typing import Any
+from typing import Any, Optional
 
 from cancel_token import CancellationToken as CT
 
+from ...log.log_core import cancellation_token as log
 from .exceptions import OperationCancelledError
 
 
 class CancellationToken(CT):
     def log_if_cancelled(
         self,
-        logger: logging.Logger,
         log_message: str,
         *log_message_args: Any,
-        log_level: int = logging.WARN,
+        log_level: Optional[int] = logging.WARN,
     ) -> bool:
         if self.cancelled:
-            logger.log(log_level, log_message, *log_message_args)
+            log.if_cancelled(log_message, *log_message_args, log_level=log_level)
         return self.cancelled
 
     def raise_if_cancelled(
         self,
-        logger: logging.Logger = None,
-        log_message: str = None,
+        log_message: Optional[str] = None,
         *log_message_args: Any,
-        log_level: int = logging.WARN,
-        exception_message: str = None,
+        log_level: Optional[int] = logging.WARN,
+        exception_message: Optional[str] = None,
     ) -> bool:
         if self.cancelled:
-            if logger and log_message:
-                logger.log(log_level, log_message, *log_message_args)
+            if log_message:
+                log.if_cancelled(log_message, *log_message_args, log_level=log_level)
             raise OperationCancelledError(exception_message or "")
         return False
 
