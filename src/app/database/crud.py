@@ -262,32 +262,6 @@ async def save_collection_files(session: AsyncSession, collection_files: Iterabl
         return collection_files
 
 
-async def insert_new_collection_files(session: AsyncSession, collection_files: Iterable[CollectionFileDB]) -> list[CollectionFileDB]:
-    """From a collection of CollectionFiles, retrieve those from the database that already exist and insert those that don't exist, yet.
-
-    Args:
-        session (AsyncSession): The database session to use.
-        collection_files (Iterable[CollectionFileDB]): A collection of CollectionFiles, already existing in the database or not.
-
-    Returns:
-        list[CollectionFileDB]: A list of CollectionFiles from the database. The order of the list elements may differ from the original order passed into the function.
-    """
-    async with session:
-        existing_collection_files = await get_collection_files_by_gdrive_file_ids(
-            session, [collection_file.gdrive_file_id for collection_file in collection_files]
-        )
-        existing_gdrive_file_ids = [collection_file.gdrive_file_id for collection_file in existing_collection_files]
-
-        new_collection_files = [
-            collection_file for collection_file in collection_files if collection_file.gdrive_file_id not in existing_gdrive_file_ids
-        ]
-        new_collection_files = await save_collection_files(session, new_collection_files)
-
-        result = list(existing_collection_files)
-        result.extend(new_collection_files)
-        return result
-
-
 __all__ = [
     delete_collection_file.__name__,
     get_collection_file.__name__,

@@ -13,6 +13,7 @@ from ..core import utils
 from ..core.config import Config
 from ..core.gdrive import GoogleDriveClient
 from ..database import AsyncAutoRollbackSession, Database, crud
+from ..database.models import CollectionFileDB
 from ..log.log_importer import importer as log
 from ..models import CollectionFileQueueItem, ImportStatus
 from . import database_worker, download_worker, import_worker
@@ -85,12 +86,8 @@ class Importer:
         if not gdrive_files:
             return False
 
-        collection_files = [FromGdriveFile.to_collection_file(gdrive_file) for gdrive_file in gdrive_files]
-        collection_files.sort(key=lambda file: file.file_name.replace("-", "_"))  # There're files where some underscores are hyphens.
-
-        log.database_entries_create()
-        async with AsyncAutoRollbackSession(self.database) as session:
-            collection_files = await crud.insert_new_collection_files(session, collection_files)
+        collection_files = create_collection_files(gdrive_files)
+        await insert_new_collection_files(collection_files, self.database)
 
         log.queue_items_create()
         queue_items = FromCollectionFileDB.to_queue_items(gdrive_files, collection_files, self.config.temp_download_folder, self.status.cancel_token)
@@ -164,6 +161,12 @@ class Importer:
         return worker_threads
 
 
+def create_collection_files(gdrive_files: Iterable[GoogleDriveFile]) -> list[CollectionFileDB]:
+    collection_files = [FromGdriveFile.to_collection_file(gdrive_file) for gdrive_file in gdrive_files]
+    collection_files.sort(key=lambda file: file.file_name.replace("-", "_"))  # There're files where some underscores are hyphens.
+    return collection_files
+
+
 def get_gdrive_file_list(
     gdrive_client: GoogleDriveClient,
     modified_after: Optional[datetime] = None,
@@ -175,6 +178,24 @@ def get_gdrive_file_list(
         gdrive_files = list(gdrive_client.list_files_by_modified_date(modified_after, modified_before))
 
     return gdrive_files
+
+
+async def insert_new_collection_files(collection_files: Iterable[CollectionFileDB], database: Database):
+    log.database_entries_create()
+    async with AsyncAutoRollbackSession(database) as session:
+        existing_collection_files = await crud.get_collection_files_by_gdrive_file_ids(
+            session, [collection_file.gdrive_file_id for collection_file in collection_files]
+        )
+        existing_gdrive_file_ids = [collection_file.gdrive_file_id for collection_file in existing_collection_files]
+
+        new_collection_files = [
+            collection_file for collection_file in collection_files if collection_file.gdrive_file_id not in existing_gdrive_file_ids
+        ]
+        new_collection_files = await crud.save_collection_files(session, new_collection_files)
+
+        result = list(existing_collection_files)
+        result.extend(new_collection_files)
+        return result
 
 
 async def wait_for_import():
