@@ -1,11 +1,16 @@
 import asyncio
 import logging
+import random
+import string
 import time
+import uuid
+from datetime import datetime
 
 import googleapiclient.errors
 import pydrive2.files
 import pytest
 
+from mock_classes import MockGDriveFile, MockGoogleDriveClient
 from src.app.core import config
 from src.app.models import CancellationToken
 
@@ -63,3 +68,16 @@ def google_api_errors(api_request_error: pydrive2.files.ApiRequestError) -> dict
 @pytest.fixture(scope="session")
 def configuration() -> config.Config:
     return config.ConfigRepository.get_config()
+
+
+@pytest.fixture(scope="function")
+def mock_gdrive_client() -> MockGoogleDriveClient:
+    return MockGoogleDriveClient()
+
+
+@pytest.fixture(scope="function")
+def random_gdrive_file() -> MockGDriveFile:
+    size = random.randint(1024, 2048)
+    character_space = string.digits + string.ascii_letters
+    content = "".join(random.choice(character_space) for _ in range(size))
+    return MockGDriveFile(uuid.uuid4(), "file_name", size, datetime(2024, 8, 1, 23, 59), content)

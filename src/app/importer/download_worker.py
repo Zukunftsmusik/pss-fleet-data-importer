@@ -8,10 +8,9 @@ from pathlib import Path
 from typing import Iterable, Optional, Union
 
 import pydrive2.files
-from pydrive2.files import GoogleDriveFile
 
 from ..core import utils
-from ..core.gdrive import GoogleDriveClient
+from ..core.gdrive import GDriveFile, GoogleDriveClient
 from ..core.models.exceptions import DownloadFailedError, OperationCancelledError
 from ..log.log_importer import download_worker as log
 from ..models import CancellationToken, CollectionFileChange, CollectionFileQueueItem, StatusFlag
@@ -127,7 +126,7 @@ def download_gdrive_file(
     log_stack_trace_on_download_error: bool,
     max_download_attempts: int = 5,
 ) -> Optional[CollectionFileQueueItem]:
-    if importer_utils.check_if_exists(queue_item.target_file_path, queue_item.item_no, queue_item.gdrive_file_size):
+    if importer_utils.check_if_exists(queue_item.target_file_path, queue_item.item_no, queue_item.gdrive_file.size):
         queue_item.download_file_path = queue_item.target_file_path
         log.file_exists(queue_item.item_no, queue_item.download_file_path)
         return queue_item
@@ -147,7 +146,7 @@ def download_gdrive_file(
     except (pydrive2.files.ApiRequestError, pydrive2.files.FileNotDownloadableError) as download_error:
         queue_item.download_file_path = None
         queue_item.error_while_downloading = True
-        raise DownloadFailedError(queue_item.gdrive_file_name, str(download_error), inner_exception=download_error) from download_error
+        raise DownloadFailedError(queue_item.gdrive_file.name, str(download_error), inner_exception=download_error) from download_error
 
     try:
         queue_item.download_file_path, queue_item.error_while_downloading = write_gdrive_file_to_disk(
@@ -155,20 +154,20 @@ def download_gdrive_file(
             queue_item.target_file_path,
             queue_item.cancel_token,
             queue_item.item_no,
-            queue_item.gdrive_file_name,
-            queue_item.gdrive_file_size,
+            queue_item.gdrive_file.name,
+            queue_item.gdrive_file.size,
             max_download_attempts,
         )
     except IOError as download_error:
         queue_item.download_file_path = None
         queue_item.error_while_downloading = True
-        raise DownloadFailedError(queue_item.gdrive_file_name, str(download_error), inner_exception=download_error) from download_error
+        raise DownloadFailedError(queue_item.gdrive_file.name, str(download_error), inner_exception=download_error) from download_error
 
     return queue_item
 
 
 def download_gdrive_file_contents(
-    gdrive_file: GoogleDriveFile,
+    gdrive_file: GDriveFile,
     gdrive_client: GoogleDriveClient,
     cancel_token: CancellationToken,
     item_no: int,
@@ -176,24 +175,23 @@ def download_gdrive_file_contents(
     log_stack_trace: bool,
 ):
     download_error: Union[pydrive2.files.ApiRequestError, pydrive2.files.FileNotDownloadableError] = None
-    gdrive_file_name = utils.get_gdrive_file_name(gdrive_file)
 
     for attempt in range(max_download_attempts):
-        cancel_token.raise_if_cancelled("Cancelled download of file no. %i: %s", item_no, gdrive_file_name, log_level=logging.DEBUG)
+        cancel_token.raise_if_cancelled("Cancelled download of file no. %i: %s", item_no, gdrive_file.name, log_level=logging.DEBUG)
 
-        log.download_gdrive_file(attempt, item_no, gdrive_file_name)
+        log.download_gdrive_file(attempt, item_no, gdrive_file.name)
 
         try:
             file_contents = gdrive_client.get_file_contents(gdrive_file)
         except (pydrive2.files.ApiRequestError, pydrive2.files.FileNotDownloadableError) as exc:
             download_error = exc
             sleep_for = timedelta(seconds=2 ^ attempt, microseconds=random.randint(0, 1000000))
-            log.download_error(item_no, gdrive_file_name, log_stack_trace, download_error, sleep_for)
+            log.download_error(item_no, gdrive_file.name, log_stack_trace, download_error, sleep_for)
             time.sleep(sleep_for.total_seconds())  # Wait for a increasing time before retrying as recommended in the google API docs
             continue
 
-        cancel_token.raise_if_cancelled("Cancelled download of file no. %i: %s", item_no, gdrive_file_name, log_level=logging.DEBUG)
-        log.download_completed(item_no, gdrive_file_name)
+        cancel_token.raise_if_cancelled("Cancelled download of file no. %i: %s", item_no, gdrive_file.name, log_level=logging.DEBUG)
+        log.download_completed(item_no, gdrive_file.name)
 
         return file_contents
 

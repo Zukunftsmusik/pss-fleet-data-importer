@@ -6,12 +6,11 @@ from typing import Iterable, Optional
 
 from httpx import ConnectError
 from pss_fleet_data import PssFleetDataClient
-from pydrive2.files import GoogleDriveFile
 
 from ..converters import FromCollectionFileDB, FromGdriveFile
 from ..core import utils
 from ..core.config import Config
-from ..core.gdrive import GoogleDriveClient
+from ..core.gdrive import GDriveFile, GoogleDriveClient
 from ..database import AsyncAutoRollbackSession, Database, crud
 from ..database.models import CollectionFileDB
 from ..log.log_importer import importer as log
@@ -161,7 +160,7 @@ class Importer:
         return worker_threads
 
 
-def create_collection_files(gdrive_files: Iterable[GoogleDriveFile]) -> list[CollectionFileDB]:
+def create_collection_files(gdrive_files: Iterable[GDriveFile]) -> list[CollectionFileDB]:
     collection_files = FromGdriveFile.to_collection_files(gdrive_files)
     collection_files.sort(key=lambda file: file.file_name.replace("-", "_"))  # There're files where some underscores are hyphens.
     return collection_files
@@ -171,7 +170,7 @@ def get_gdrive_file_list(
     gdrive_client: GoogleDriveClient,
     modified_after: Optional[datetime] = None,
     modified_before: Optional[datetime] = None,
-) -> list[GoogleDriveFile]:
+) -> list[GDriveFile]:
     log.download_gdrive_file_list_start()
 
     with log.download_gdrive_file_list_duration():

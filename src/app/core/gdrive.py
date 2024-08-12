@@ -2,16 +2,28 @@ import json
 import urllib.parse
 from datetime import datetime
 from pathlib import Path
-from typing import Generator, Optional
+from typing import Generator, Iterable, Optional
 
+import dateutil.parser
 import pydrive2.auth
 import pydrive2.drive
-import pydrive2.files
 import yaml
-from pydrive2.files import GoogleDriveFile, GoogleDriveFileList
+from pydrive2.files import ApiRequestError, FileNotDownloadableError, GoogleDriveFile
 
 from ..log.log_core import gdrive as log
 from . import utils
+
+
+class GDriveFile:
+    def __init__(self, google_drive_file: GoogleDriveFile):
+        self.id = google_drive_file["id"]
+        self.name = get_gdrive_file_name(google_drive_file)
+        self.size = google_drive_file["fileSize"]
+        self.modified_date = dateutil.parser.parse(google_drive_file["modifiedDate"])
+        self.__google_drive_file = google_drive_file
+
+    def get_content_string(self, mimetype: Optional[str] = None, encoding: str = "utf-8", remove_bom: bool = False):
+        return self.__google_drive_file.GetContentString(mimetype=mimetype, encoding=encoding, remove_bom=remove_bom)
 
 
 class GoogleDriveClient:
@@ -44,12 +56,19 @@ class GoogleDriveClient:
         self.__gauth: pydrive2.auth.GoogleAuth = None
         self.__drive: pydrive2.drive.GoogleDrive = None
 
-    def get_file_contents(self, file: pydrive2.files.GoogleDriveFile) -> str:
-        return get_file_contents(file)
+    def get_file_contents(self, file: GDriveFile) -> str:
+        try:
+            with log.download_file(file.name):
+                result = file.get_content_string()
+        except (ApiRequestError, FileNotDownloadableError) as exc:
+            log.download_file_error(file.name, exc)
+            raise exc
+
+        return result
 
     def list_files_by_modified_date(
         self, modified_after: Optional[datetime] = None, modified_before: Optional[datetime] = None
-    ) -> Generator[pydrive2.files.GoogleDriveFile, None, None]:
+    ) -> Generator[GDriveFile, None, None]:
         self.__ensure_initialized()
 
         criteria = [self.__base_criteria]
@@ -65,7 +84,8 @@ class GoogleDriveClient:
             "q": " and ".join(criteria),
         }
 
-        file_list: list[pydrive2.files.GoogleDriveFile] = self.__drive.ListFile(param=params).GetList()
+        google_drive_files: list[GoogleDriveFile] = self.__drive.ListFile(param=params).GetList()
+        file_list = FromGoogleDriveFile.to_gdrive_files(google_drive_files)
 
         for file in file_list:
             yield file
@@ -153,22 +173,32 @@ class GoogleDriveClient:
             yaml.dump(contents, fp)
 
 
-def get_file_contents(file: pydrive2.files.GoogleDriveFile) -> str:
-    file_name = utils.get_gdrive_file_name(file)
+class FromGoogleDriveFile:
+    @staticmethod
+    def to_gdrive_file(source: GoogleDriveFile) -> GDriveFile:
+        return GDriveFile(source)
 
-    try:
-        with log.download_file(file_name):
-            result = file.GetContentString()
-    except (pydrive2.files.ApiRequestError, pydrive2.files.FileNotDownloadableError) as exc:
-        log.download_file_error(file_name, exc)
-        raise exc
+    @staticmethod
+    def to_gdrive_files(sources: Iterable[GoogleDriveFile]) -> GDriveFile:
+        return [FromGoogleDriveFile.to_gdrive_file(source) for source in sources]
 
-    return result
+
+def get_gdrive_file_name(gdrive_file: GoogleDriveFile) -> str:
+    """Returns the file name of a `GoogleDriveFile` of API version 2 or 3.
+
+    Args:
+        gdrive_file (GoogleDriveFile): The file to retrieve the file name from.
+
+    Returns:
+        str: The file name.
+    """
+    file_name = gdrive_file.get("title") or gdrive_file.get("name")  # "name" is gdrive API V3, "title" is V2
+    return file_name
 
 
 __all__ = [
+    # Classes
     GoogleDriveClient.__name__,
     # External references
-    GoogleDriveFile.__name__,
-    GoogleDriveFileList.__name__,
+    GDriveFile.__name__,
 ]

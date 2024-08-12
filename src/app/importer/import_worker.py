@@ -42,7 +42,7 @@ async def worker(
                 continue
 
         if await skip_file_import_on_error(queue_item.item_no, queue_item):
-            log.skip_file_error(queue_item.item_no, queue_item.gdrive_file_name)
+            log.skip_file_error(queue_item.item_no, queue_item.gdrive_file.name)
             import_queue.task_done()
             continue
 
@@ -51,7 +51,7 @@ async def worker(
         try:
             imported_at = await import_file(fleet_data_client, queue_item)
         except ApiError as exc:
-            log.file_import_api_error(queue_item.item_no, queue_item.gdrive_file_name, exc)
+            log.file_import_api_error(queue_item.item_no, queue_item.gdrive_file.name, exc)
             continue
 
         database_queue.put((queue_item, CollectionFileChange(imported_at=imported_at)))
@@ -85,7 +85,7 @@ async def skip_file_import_on_error(file_no: int, queue_item: CollectionFileQueu
         return True
 
     if queue_item.error_while_downloading:
-        log.skip_file_import_download_error(file_no, queue_item.gdrive_file_name)
+        log.skip_file_import_download_error(file_no, queue_item.gdrive_file.name)
         return True
 
     with open(queue_item.download_file_path, "r") as fp:

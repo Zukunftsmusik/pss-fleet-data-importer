@@ -2,34 +2,15 @@ import pytest
 from pss_fleet_data import PssFleetDataClient
 from pydrive2.files import GoogleDriveFile
 
+from mock_classes import MockPssFleetDataClient
 from src.app.core import config
 from src.app.core.gdrive import GoogleDriveClient
 from src.app.importer import Importer
 
 
-class MockGoogleDriveClient(GoogleDriveClient):
-    def __init__(self):
-        pass
-
-
-class MockPssFleetDataClient(PssFleetDataClient):
-    def __init__(self):
-        pass
-
-
 @pytest.fixture(scope="function")
-def mock_gdrive_client() -> MockGoogleDriveClient:
-    return MockGoogleDriveClient()
-
-
-@pytest.fixture(scope="function")
-def mock_fleet_data_client() -> MockGoogleDriveClient:
+def mock_fleet_data_client() -> MockPssFleetDataClient:
     return MockPssFleetDataClient()
-
-
-@pytest.fixture(scope="function")
-def patch_gdrive_client_new(mock_gdrive_client: MockGoogleDriveClient, monkeypatch: pytest.MonkeyPatch):
-    monkeypatch.setattr(GoogleDriveClient, "__new__", mock_gdrive_client)
 
 
 @pytest.fixture(scope="function")

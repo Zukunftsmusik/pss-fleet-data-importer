@@ -1,12 +1,7 @@
-from datetime import datetime
 from pathlib import Path
 from threading import Lock
 
-import dateutil
-import dateutil.parser
-from pydrive2.files import GoogleDriveFile
-
-from ..core import utils
+from ..core.gdrive import GDriveFile
 from ..core.models.cancellation_token import CancellationToken
 from ..core.models.collection_file_change import CollectionFileChange
 from ..database import crud
@@ -19,14 +14,14 @@ class CollectionFileQueueItem:
     def __init__(
         self,
         item_no: int,
-        gdrive_file: GoogleDriveFile,
+        gdrive_file: GDriveFile,
         collection_file: CollectionFileDB,
         target_directory: Path,
         cancel_token: CancellationToken,
     ):
         self.cancel_token: CancellationToken = cancel_token
         self.item_no: int = item_no
-        self.gdrive_file: GoogleDriveFile = gdrive_file
+        self.gdrive_file: GDriveFile = gdrive_file
         self.__collection_file: CollectionFileDB = collection_file
         self.__collection_file_lock: Lock = Lock()
         self.__download_file_path: Path = None
@@ -66,28 +61,12 @@ class CollectionFileQueueItem:
             self.__error_while_downloading = value
 
     @property
-    def gdrive_file_size(self) -> int:
-        return int(self.gdrive_file["fileSize"])
-
-    @property
-    def gdrive_file_id(self) -> str:
-        return self.gdrive_file["id"]
-
-    @property
-    def gdrive_file_name(self) -> str:
-        return utils.get_gdrive_file_name(self.gdrive_file)
-
-    @property
-    def gdrive_modified_date(self) -> datetime:
-        return dateutil.parser.parse(self.gdrive_file["modifiedDate"])
-
-    @property
     def target_directory_path(self) -> Path:
         return self.__target_directory_path
 
     @property
     def target_file_path(self) -> Path:
-        return self.target_directory_path.joinpath(self.gdrive_file_name)
+        return self.target_directory_path.joinpath(self.gdrive_file.name)
 
     async def update_collection_file(self, database: Database, change: CollectionFileChange) -> CollectionFileDB:
         with self.__collection_file_lock:

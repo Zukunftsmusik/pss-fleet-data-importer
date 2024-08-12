@@ -5,8 +5,6 @@ from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any, Awaitable, Callable, Iterable, Mapping, Optional, Union
 
-from pydrive2.files import GoogleDriveFile
-
 from .models.cancellation_token import CancellationToken
 from .models.status import StatusFlag
 
@@ -39,19 +37,6 @@ def extract_timestamp_from_gdrive_file_name(file_name: str) -> datetime:
         except ValueError:
             pass
     raise ValueError(f"The provided file name did not match any of the expected formats: {format_strings}")
-
-
-def get_gdrive_file_name(gdrive_file: GoogleDriveFile) -> str:
-    """Returns the file name of a `GoogleDriveFile` of API version 2 or 3.
-
-    Args:
-        gdrive_file (GoogleDriveFile): The file to retrieve the file name from.
-
-    Returns:
-        str: The file name.
-    """
-    file_name = gdrive_file.get("title") or gdrive_file.get("name")  # "name" is gdrive API V3, "title" is V2
-    return file_name
 
 
 def get_next_full_hour(dt: datetime) -> datetime:
@@ -141,7 +126,6 @@ def create_async_thread(
 __all__ = [
     create_async_thread.__name__,
     extract_timestamp_from_gdrive_file_name.__name__,
-    get_gdrive_file_name.__name__,
     get_next_full_hour.__name__,
     get_now.__name__,
     remove_timezone.__name__,
