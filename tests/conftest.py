@@ -65,7 +65,7 @@ def google_api_errors(api_request_error: pydrive2.files.ApiRequestError) -> dict
     }
 
 
-@pytest.fixture(scope="session")
+@pytest.fixture(scope="function")
 def configuration() -> config.Config:
     return config.ConfigRepository.get_config()
 

@@ -5,6 +5,7 @@ from datetime import datetime  # noqa
 
 from pss_fleet_data import PssFleetDataClient
 
+from .. import __version__
 from .core import config
 from .core.gdrive import GoogleDriveClient
 from .database import db
@@ -21,7 +22,7 @@ async def main():
     print("    PSS FLEET DATA IMPORTER")
     print("  ===========================")
     print()
-    print(f"  Version: {configuration.app_version}")
+    print(f"  Version: {__version__}")
     print(f"  Log level: {logging.getLevelName(configuration.log_level)}")
     print(f"  Debug mode: {configuration.debug_mode}")
     print(f"  API server URL: {configuration.api_default_server_url}")

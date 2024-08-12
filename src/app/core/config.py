@@ -10,8 +10,6 @@ from typing import Optional
 @dataclass(frozen=True)
 class Config:
     # Basic settings
-    app_name: str = "importer"
-    app_version: str = "0.1.0"
     pss_start_date: datetime = datetime(2016, 1, 6, tzinfo=timezone.utc)
     earliest_data_date: datetime = datetime(2019, 10, 10, tzinfo=timezone.utc)
     temp_download_folder: Path = Path("./downloads")

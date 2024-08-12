@@ -1,8 +1,8 @@
 from . import core, database, importer, models
 
 
-__app_name__ = core.config.ConfigRepository.get_config().app_name
-__version__ = core.config.ConfigRepository.get_config().app_version
+__app_name__ = "importer"
+__version__ = "0.1.0"
 
 
 __all__ = [
