@@ -162,7 +162,7 @@ class Importer:
 
 
 def create_collection_files(gdrive_files: Iterable[GoogleDriveFile]) -> list[CollectionFileDB]:
-    collection_files = [FromGdriveFile.to_collection_file(gdrive_file) for gdrive_file in gdrive_files]
+    collection_files = FromGdriveFile.to_collection_files(gdrive_files)
     collection_files.sort(key=lambda file: file.file_name.replace("-", "_"))  # There're files where some underscores are hyphens.
     return collection_files
 
