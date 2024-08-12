@@ -10,7 +10,7 @@ DOWNLOADED_AT = datetime(2024, 1, 1)
 IMPORTED_AT = datetime(2024, 2, 1)
 
 
-test_cases_str = [
+test_cases_repr = [
     # downloaded_at, imported_at, download_error
     pytest.param(None, None, None, id="none_none_none"),
     pytest.param(DOWNLOADED_AT, None, None, id="set_none_none"),
@@ -25,15 +25,27 @@ test_cases_str = [
     pytest.param(DOWNLOADED_AT, IMPORTED_AT, None, id="set_set_true"),
     pytest.param(DOWNLOADED_AT, IMPORTED_AT, None, id="set_set_false"),
 ]
+"""downloaded_at: Optional[datetime], imported_at: Optional[datetime], download_error: Optional[bool]"""
 
 
-@pytest.mark.parametrize(["downloaded_at", "imported_at", "download_error"], test_cases_str)
+@pytest.mark.parametrize(["downloaded_at", "imported_at", "download_error"], test_cases_repr)
 def test_downloaded_at_in_str(downloaded_at: Optional[datetime], imported_at: Optional[datetime], download_error: Optional[bool]):
-    string = str(CollectionFileChange(downloaded_at=downloaded_at, imported_at=imported_at, download_error=download_error))
+    string = repr(CollectionFileChange(downloaded_at=downloaded_at, imported_at=imported_at, download_error=download_error))
+
+    assert string.startswith(f"<{CollectionFileChange.__name__}")
+    assert string.endswith(">")
 
     if downloaded_at:
         assert f"downloaded_at={downloaded_at.isoformat()}" in string
+    else:
+        assert "downloaded_at=None" in string
+
     if imported_at:
         assert f"imported_at={imported_at.isoformat()}" in string
-    if download_error is not None:
+    else:
+        assert "imported_at=None" in string
+
+    if download_error is None:
+        assert "download_error=None" in string
+    else:
         assert f"download_error={download_error}" in string
