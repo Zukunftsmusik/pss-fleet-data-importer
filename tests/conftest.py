@@ -9,9 +9,11 @@ from datetime import datetime
 import googleapiclient.errors
 import pydrive2.files
 import pytest
+from pydrive2.files import GoogleDriveFile
 
 from mock_classes import MockGDriveFile, MockGoogleDriveClient
 from src.app.core import config
+from src.app.core.gdrive import GDriveFile
 from src.app.models import CancellationToken
 
 
@@ -76,8 +78,67 @@ def mock_gdrive_client() -> MockGoogleDriveClient:
 
 
 @pytest.fixture(scope="function")
-def random_gdrive_file() -> MockGDriveFile:
-    size = random.randint(1024, 2048)
+def mock_gdrive_file(
+    google_drive_file_id: str,
+    google_drive_file_size: int,
+    google_drive_file_content: str,
+    google_drive_file_name: str,
+    google_drive_file_modified_date: datetime,
+) -> MockGDriveFile:
+    return MockGDriveFile(
+        google_drive_file_id,
+        google_drive_file_name,
+        google_drive_file_size,
+        google_drive_file_modified_date,
+        google_drive_file_content,
+    )
+
+
+@pytest.fixture(scope="function")
+def google_drive_file_content(google_drive_file_size: int) -> str:
     character_space = string.digits + string.ascii_letters
-    content = "".join(random.choice(character_space) for _ in range(size))
-    return MockGDriveFile(uuid.uuid4(), "file_name", size, datetime(2024, 8, 1, 23, 59), content)
+    return "".join(random.choice(character_space) for _ in range(google_drive_file_size))
+
+
+@pytest.fixture(scope="function")
+def google_drive_file_id() -> str:
+    return str(uuid.uuid4())
+
+
+@pytest.fixture(scope="function")
+def google_drive_file_name() -> str:
+    return "gdrive_file_name"
+
+
+@pytest.fixture(scope="function")
+def google_drive_file_size() -> int:
+    return random.randint(1024, 2048)
+
+
+@pytest.fixture(scope="function")
+def google_drive_file_modified_date() -> datetime:
+    return datetime(2024, 8, 1, 23, 59)
+
+
+@pytest.fixture(scope="function")
+def google_drive_file(
+    google_drive_file_id: str,
+    google_drive_file_size: int,
+    google_drive_file_name: str,
+    google_drive_file_modified_date: datetime,
+) -> GoogleDriveFile:
+    return GoogleDriveFile(
+        None,
+        {
+            "id": google_drive_file_id,
+            "fileSize": google_drive_file_size,
+            "title": google_drive_file_name,
+            "modifiedDate": google_drive_file_modified_date.isoformat(),
+        },
+        uploaded=True,
+    )
+
+
+@pytest.fixture(scope="function")
+def gdrive_file(google_drive_file: GoogleDriveFile) -> GDriveFile:
+    return GDriveFile(google_drive_file)

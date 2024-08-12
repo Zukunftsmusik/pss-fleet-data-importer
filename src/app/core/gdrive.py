@@ -23,7 +23,7 @@ class GDriveFile:
         self.__google_drive_file = google_drive_file
 
     def get_content_string(self, mimetype: Optional[str] = None, encoding: str = "utf-8", remove_bom: bool = False):
-        return self.__google_drive_file.GetContentString(mimetype=mimetype, encoding=encoding, remove_bom=remove_bom)
+        return self.__google_drive_file.GetContentString(mimetype, encoding, remove_bom)
 
 
 class GoogleDriveClient:
