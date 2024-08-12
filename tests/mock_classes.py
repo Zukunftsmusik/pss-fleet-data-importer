@@ -1,17 +1,19 @@
+from dataclasses import dataclass
 from datetime import datetime
 from typing import Any, Mapping
 
 from pss_fleet_data import PssFleetDataClient
 
+from src.app.core.config import ConfigBase
 from src.app.core.gdrive import GDriveFile, GoogleDriveClient
 
 
+@dataclass(frozen=False)
+class MockConfig(ConfigBase):
+    pass
+
+
 class MockGoogleDriveClient(GoogleDriveClient):
-    def __init__(self):
-        pass
-
-
-class MockPssFleetDataClient(PssFleetDataClient):
     def __init__(self):
         pass
 
@@ -26,3 +28,8 @@ class MockGDriveFile(GDriveFile):
 
     def get_content_string(self, *args: Any, **kwargs: Mapping[str, Any]):
         return self.content
+
+
+class MockPssFleetDataClient(PssFleetDataClient):
+    def __init__(self):
+        pass
