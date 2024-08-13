@@ -30,7 +30,7 @@ async def process_queue_item(database_queue: queue.Queue, none_count: int) -> in
     try:
         queue_item, change = database_queue.get(block=False)
     except queue.Empty:
-        await asyncio.sleep(0.1)
+        await asyncio.sleep(0.01)
         return none_count
 
     if queue_item is None and change is None:
