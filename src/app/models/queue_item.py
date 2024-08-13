@@ -75,7 +75,10 @@ class CollectionFileQueueItem:
             if change.imported_at:
                 self.__collection_file.imported_at = change.imported_at
 
-            if not self.cancel_token.cancelled:
+            if change.download_error is not None:
+                self.__collection_file.download_error = change.download_error
+
+            if not self.cancel_token or not self.cancel_token.cancelled:
                 async with DatabaseRepository.get_session() as session:
                     self.__collection_file = await crud.save_collection_file(session, self.__collection_file)
 

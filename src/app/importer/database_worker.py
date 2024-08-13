@@ -33,7 +33,7 @@ async def worker(
             else:
                 continue
 
-        await update_queue_item(change)
+        await update_queue_item(queue_item, change)
 
         database_queue.task_done()
 

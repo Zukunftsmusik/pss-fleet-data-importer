@@ -14,6 +14,7 @@ from pydrive2.files import GoogleDriveFile
 from mock_classes import MockGDriveFile, MockGoogleDriveClient
 from src.app.core import config
 from src.app.core.gdrive import GDriveFile
+from src.app.database.models import CollectionFileDB
 from src.app.models import CancellationToken
 
 
@@ -117,6 +118,11 @@ def google_drive_file_size() -> int:
 
 @pytest.fixture(scope="function")
 def google_drive_file_modified_date() -> datetime:
+    return datetime(2024, 8, 1, 23, 59, 30)
+
+
+@pytest.fixture(scope="function")
+def google_drive_file_timestamp() -> datetime:
     return datetime(2024, 8, 1, 23, 59)
 
 
@@ -142,3 +148,19 @@ def google_drive_file(
 @pytest.fixture(scope="function")
 def gdrive_file(google_drive_file: GoogleDriveFile) -> GDriveFile:
     return GDriveFile(google_drive_file)
+
+
+@pytest.fixture(scope="function")
+def collection_file_db(
+    google_drive_file_id: str,
+    google_drive_file_name: str,
+    google_drive_file_modified_date: datetime,
+    google_drive_file_timestamp: datetime,
+) -> CollectionFileDB:
+    return CollectionFileDB(
+        collection_file_id=1,
+        gdrive_file_id=google_drive_file_id,
+        file_name=google_drive_file_name,
+        gdrive_modified_date=google_drive_file_modified_date,
+        timestamp=google_drive_file_timestamp,
+    )
