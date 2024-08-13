@@ -1,5 +1,6 @@
 from pathlib import Path
 from threading import Lock
+from typing import Union
 
 from ..core.gdrive import GDriveFile
 from ..core.models.cancellation_token import CancellationToken
@@ -15,7 +16,7 @@ class CollectionFileQueueItem:
         item_no: int,
         gdrive_file: GDriveFile,
         collection_file: CollectionFileDB,
-        target_directory: Path,
+        target_directory: Union[Path, str],
         cancel_token: CancellationToken,
     ):
         self.cancel_token: CancellationToken = cancel_token
@@ -45,9 +46,12 @@ class CollectionFileQueueItem:
             return self.__download_file_path
 
     @download_file_path.setter
-    def download_file_path(self, value: Path):
+    def download_file_path(self, value: Union[Path, str]):
         with self.__download_file_path_lock:
-            self.__download_file_path = value
+            if value:
+                self.__download_file_path = Path(value)
+            else:
+                self.__download_file_path = None
 
     @property
     def error_while_downloading(self) -> bool:

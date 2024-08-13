@@ -16,6 +16,7 @@ from src.app.core import config
 from src.app.core.gdrive import GDriveFile
 from src.app.database.models import CollectionFileDB
 from src.app.models import CancellationToken
+from src.app.models.queue_item import CollectionFileQueueItem
 
 
 class MockHttpResponse:
@@ -164,3 +165,8 @@ def collection_file_db(
         gdrive_modified_date=google_drive_file_modified_date,
         timestamp=google_drive_file_timestamp,
     )
+
+
+@pytest.fixture(scope="function")
+def queue_item(gdrive_file, collection_file_db) -> CollectionFileQueueItem:
+    return CollectionFileQueueItem(1, gdrive_file, collection_file_db, "/dev/null", None)
