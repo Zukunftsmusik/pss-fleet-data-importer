@@ -131,7 +131,7 @@ def google_drive_file(
         None,
         {
             "id": google_drive_file_id,
-            "fileSize": google_drive_file_size,
+            "fileSize": str(google_drive_file_size),
             "title": google_drive_file_name,
             "modifiedDate": google_drive_file_modified_date.isoformat(),
         },

@@ -16,11 +16,11 @@ from . import utils
 
 class GDriveFile:
     def __init__(self, google_drive_file: GoogleDriveFile):
-        self.id = google_drive_file["id"]
-        self.name = get_gdrive_file_name(google_drive_file)
-        self.size = google_drive_file["fileSize"]
-        self.modified_date = dateutil.parser.parse(google_drive_file["modifiedDate"])
-        self.__google_drive_file = google_drive_file
+        self.id: str = google_drive_file["id"]
+        self.name: str = get_gdrive_file_name(google_drive_file)
+        self.size: int = int(google_drive_file["fileSize"])
+        self.modified_date: datetime = dateutil.parser.parse(google_drive_file["modifiedDate"])
+        self.__google_drive_file: GoogleDriveFile = google_drive_file
 
     def get_content_string(self, mimetype: Optional[str] = None, encoding: str = "utf-8", remove_bom: bool = False):
         return self.__google_drive_file.GetContentString(mimetype, encoding, remove_bom)

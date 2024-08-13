@@ -14,6 +14,12 @@ def test_create(
     google_drive_file_modified_date: datetime,
 ):
     gdrive_file = GDriveFile(google_drive_file)
+
+    assert isinstance(gdrive_file.id, str)
+    assert isinstance(gdrive_file.size, int)
+    assert isinstance(gdrive_file.name, str)
+    assert isinstance(gdrive_file.modified_date, datetime)
+
     assert gdrive_file.id == google_drive_file_id
     assert gdrive_file.size == google_drive_file_size
     assert gdrive_file.name == google_drive_file_name
