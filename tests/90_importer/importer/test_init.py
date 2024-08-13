@@ -8,13 +8,11 @@ from src.app.models import ImportStatus
 def test_init(configuration: Config):
     importer = Importer(
         configuration,
-        "database",
         "gdrive_client",
         "pss_fleet_data_client",
     )
 
     assert id(importer.config) == id(configuration)
-    assert importer.database == "database"
     assert importer.gdrive_client == "gdrive_client"
     assert importer.fleet_data_client == "pss_fleet_data_client"
     assert isinstance(importer.status, ImportStatus)

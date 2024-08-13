@@ -11,7 +11,7 @@ from ..converters import FromCollectionFileDB, FromGdriveFile
 from ..core import utils
 from ..core.config import Config
 from ..core.gdrive import GDriveFile, GoogleDriveClient
-from ..database import AsyncAutoRollbackSession, Database, crud
+from ..database import DatabaseRepository, crud
 from ..database.models import CollectionFileDB
 from ..log.log_importer import importer as log
 from ..models import CollectionFileQueueItem, ImportStatus
@@ -22,12 +22,10 @@ class Importer:
     def __init__(
         self,
         config: Config,
-        database: Database,
         gdrive_client: GoogleDriveClient,
         pss_fleet_data_client: PssFleetDataClient,
     ):
         self.config: Config = config
-        self.database: Database = database
         self.gdrive_client: GoogleDriveClient = gdrive_client
         self.fleet_data_client: PssFleetDataClient = pss_fleet_data_client
 
@@ -55,7 +53,7 @@ class Importer:
 
             after = modified_after
             if not modified_after:
-                async with AsyncAutoRollbackSession(self.database) as session:
+                async with DatabaseRepository.get_session() as session:
                     earliest_not_imported_modified_date = await crud.get_earliest_gdrive_modified_date(session)
                     after = utils.get_next_full_hour(earliest_not_imported_modified_date) if earliest_not_imported_modified_date else None
 
@@ -86,7 +84,7 @@ class Importer:
             return False
 
         collection_files = create_collection_files(gdrive_files)
-        await insert_new_collection_files(collection_files, self.database)
+        await insert_new_collection_files(collection_files)
 
         log.queue_items_create()
         queue_items = FromCollectionFileDB.to_queue_items(gdrive_files, collection_files, self.config.temp_download_folder, self.status.cancel_token)
@@ -147,7 +145,6 @@ class Importer:
                 database_worker.worker,
                 name="Database worker",
                 args=(
-                    self.database,
                     self.database_queue,
                     self.status.bulk_database_running,
                     self.status.cancel_token,
@@ -179,9 +176,9 @@ def get_gdrive_file_list(
     return gdrive_files
 
 
-async def insert_new_collection_files(collection_files: Iterable[CollectionFileDB], database: Database):
+async def insert_new_collection_files(collection_files: Iterable[CollectionFileDB]):
     log.database_entries_create()
-    async with AsyncAutoRollbackSession(database) as session:
+    async with DatabaseRepository.get_session() as session:
         existing_collection_files = await crud.get_collection_files_by_gdrive_file_ids(
             session, [collection_file.gdrive_file_id for collection_file in collection_files]
         )

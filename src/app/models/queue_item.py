@@ -5,8 +5,7 @@ from ..core.gdrive import GDriveFile
 from ..core.models.cancellation_token import CancellationToken
 from ..core.models.collection_file_change import CollectionFileChange
 from ..database import crud
-from ..database.async_auto_rollback_session import AsyncAutoRollbackSession
-from ..database.db import Database
+from ..database.db_repository import DatabaseRepository
 from ..database.models import CollectionFileDB
 
 
@@ -68,7 +67,7 @@ class CollectionFileQueueItem:
     def target_file_path(self) -> Path:
         return self.target_directory_path.joinpath(self.gdrive_file.name)
 
-    async def update_collection_file(self, database: Database, change: CollectionFileChange) -> CollectionFileDB:
+    async def update_collection_file(self, change: CollectionFileChange) -> CollectionFileDB:
         with self.__collection_file_lock:
             if change.downloaded_at:
                 self.__collection_file.downloaded_at = change.downloaded_at
@@ -77,7 +76,7 @@ class CollectionFileQueueItem:
                 self.__collection_file.imported_at = change.imported_at
 
             if not self.cancel_token.cancelled:
-                async with AsyncAutoRollbackSession(database) as session:
+                async with DatabaseRepository.get_session() as session:
                     self.__collection_file = await crud.save_collection_file(session, self.__collection_file)
 
             return self.__collection_file

@@ -12,7 +12,6 @@ from sqlalchemy.sql import text
 from sqlmodel import SQLModel, create_engine
 from sqlmodel.ext.asyncio.session import AsyncSession
 
-from ..core import config
 from ..log.log_database import db as log
 from .models import *  # noqa: F403, F401
 
@@ -126,27 +125,7 @@ class Database:
         engine.dispose()
 
 
-__DATABASE: Database = None
-
-
-class DatabaseRepository:
-    __database: Database = None
-
-    @classmethod
-    def get_db(cls) -> Database:
-        if not cls.__database:
-            configuration = config.ConfigRepository.get_config()
-            cls.__database = Database(
-                configuration.db_sync_connection_str,
-                configuration.db_async_connection_str,
-                configuration.db_engine_echo,
-            )
-            cls.__database.initialize_database(reinitialize=configuration.reinitialize_database_on_startup)
-        return cls.__database
-
-
 __all__ = [
     # Classes
     Database.__name__,
-    DatabaseRepository.__name__,
 ]

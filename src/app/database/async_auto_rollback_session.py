@@ -9,7 +9,7 @@ from .db import Database
 
 class AsyncAutoRollbackSession(AbstractAsyncContextManager):
     def __init__(self, database: Database):
-        self.__database = database
+        self.__database: Database = database
         self.__session: AsyncSession = None
 
     async def __aenter__(self):
@@ -22,3 +22,9 @@ class AsyncAutoRollbackSession(AbstractAsyncContextManager):
             log.transaction_error(exception)
             await self.__session.rollback()
         await self.__session.close()
+
+
+__all__ = [
+    # Classes
+    AsyncAutoRollbackSession.__name__,
+]

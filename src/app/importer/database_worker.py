@@ -1,13 +1,11 @@
 import asyncio
 import queue
 
-from ..database import Database
 from ..log.log_importer import database_worker as log
 from ..models import CancellationToken, CollectionFileChange, CollectionFileQueueItem, StatusFlag
 
 
 async def worker(
-    database: Database,
     database_queue: queue.Queue,
     status_flag: StatusFlag,
     cancel_token: CancellationToken,
@@ -35,10 +33,14 @@ async def worker(
             else:
                 continue
 
-        await queue_item.update_collection_file(database, change)
-        log.queue_item_update(queue_item, change)
+        await update_queue_item(change)
 
         database_queue.task_done()
 
     log.database_worker_ended(cancel_token)
     status_flag.value = False
+
+
+async def update_queue_item(queue_item: CollectionFileQueueItem, change: CollectionFileChange):
+    await queue_item.update_collection_file(change)
+    log.queue_item_update(queue_item.item_no, change)

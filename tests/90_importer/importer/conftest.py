@@ -13,4 +13,4 @@ def mock_fleet_data_client() -> MockPssFleetDataClient:
 
 @pytest.fixture(scope="function")
 def importer(configuration: config.Config, mock_fleet_data_client: PssFleetDataClient) -> Importer:
-    return Importer(configuration, None, None, mock_fleet_data_client)
+    return Importer(configuration, None, mock_fleet_data_client)

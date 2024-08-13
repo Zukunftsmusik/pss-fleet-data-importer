@@ -8,7 +8,6 @@ from pss_fleet_data import PssFleetDataClient
 from .. import __version__
 from .core import config
 from .core.gdrive import GoogleDriveClient
-from .database import db
 from .importer import Importer
 from .log import base as logger_base
 
@@ -31,8 +30,6 @@ async def main():
     print(f"  Download thread pool size: {configuration.download_thread_pool_size}")
     print()
 
-    database = db.DatabaseRepository.get_db()
-
     gdrive_client = GoogleDriveClient(
         configuration.gdrive_project_id,
         configuration.gdrive_private_key_id,
@@ -50,7 +47,6 @@ async def main():
 
     importer = Importer(
         configuration,
-        database,
         gdrive_client,
         pss_fleet_data_client,
     )

@@ -1,6 +1,5 @@
 from ...core.models.cancellation_token import CancellationToken
 from ...core.models.collection_file_change import CollectionFileChange
-from ...models.queue_item import CollectionFileQueueItem
 from .importer import LOGGER as LOGGER_IMPORTER
 from .importer import worker_ended, worker_started
 
@@ -17,8 +16,8 @@ def database_worker_started():
     worker_started(WORKER_NAME)
 
 
-def queue_item_update(queue_item: CollectionFileQueueItem, change: CollectionFileChange):
-    LOGGER.debug("Updated queue item no. %i: %s", queue_item.item_no, change)
+def queue_item_update(item_no: int, change: CollectionFileChange):
+    LOGGER.debug("Updated queue item no. %i: %s", item_no, change)
 
 
 __all__ = [
