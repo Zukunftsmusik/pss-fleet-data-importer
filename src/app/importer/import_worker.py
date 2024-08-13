@@ -19,6 +19,7 @@ async def worker(
     cancel_token: CancellationToken,
     exit_after_none_count: int,
     keep_downloaded_files: bool = False,
+    filesystem: FileSystem = FileSystem(),
 ):
     status_flag.value = True
     log.import_worker_started()
@@ -53,7 +54,7 @@ async def worker(
         database_queue.put((queue_item, CollectionFileChange(imported_at=imported_at)))
 
         if not keep_downloaded_files:
-            queue_item.download_file_path.unlink(missing_ok=True)
+            filesystem.delete(queue_item.download_file_path, missing_ok=True)
 
         import_queue.task_done()
 

@@ -137,8 +137,8 @@ def download_gdrive_file(
         return queue_item
     else:
         log.file_delete(queue_item.item_no)
+        # File also counts as not existing, if the file size differs from the file on gdrive
         filesystem.delete(queue_item.target_file_path, missing_ok=True)
-        queue_item.target_file_path.unlink(missing_ok=True)  # File also counts as not existing, if the file size differs from the file on gdrive
 
     try:
         file_contents = download_gdrive_file_contents(
