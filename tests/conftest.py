@@ -18,7 +18,7 @@ from src.app.core.models.status import StatusFlag
 from src.app.database.models import CollectionFileDB
 from src.app.models import CancellationToken
 from src.app.models.queue_item import CollectionFileQueueItem
-from tests.fake_classes import FakeGDriveFile, FakeGoogleDriveClient
+from tests.fake_classes import FakeFileSystem, FakeGDriveFile, FakeGoogleDriveClient
 
 
 class MockHttpResponse:
@@ -187,3 +187,8 @@ def status_flag_true() -> StatusFlag:
 @pytest.fixture(scope="function")
 def queue() -> Queue:
     return Queue()
+
+
+@pytest.fixture(scope="function")
+def filesystem() -> FakeFileSystem:
+    return FakeFileSystem()

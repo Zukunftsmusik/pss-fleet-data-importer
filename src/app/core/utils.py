@@ -6,6 +6,7 @@ from pathlib import Path
 from typing import Any, Awaitable, Callable, Iterable, Mapping, Optional, Union
 
 from .models.cancellation_token import CancellationToken
+from .models.filesystem import FileSystem
 from .models.status import StatusFlag
 
 
@@ -62,9 +63,9 @@ def get_now() -> datetime:
     return remove_timezone(datetime.now(tz=timezone.utc))
 
 
-def is_empty_file(file_path: Union[Path, str]) -> bool:
-    file_path = Path(file_path)
-    return file_path.stat().st_size < 1
+def is_empty_file(file_path: Union[Path, str], filesystem: Optional[FileSystem] = None) -> bool:
+    filesystem = filesystem or FileSystem()
+    return filesystem.get_size(file_path) == 0
 
 
 def remove_timezone(dt: Optional[datetime]) -> datetime:

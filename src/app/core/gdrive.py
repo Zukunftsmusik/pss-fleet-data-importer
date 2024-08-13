@@ -1,4 +1,3 @@
-import json
 import urllib.parse
 from datetime import datetime
 from pathlib import Path
@@ -7,11 +6,11 @@ from typing import Generator, Iterable, Optional
 import dateutil.parser
 import pydrive2.auth
 import pydrive2.drive
-import yaml
 from pydrive2.files import ApiRequestError, FileNotDownloadableError, GoogleDriveFile
 
 from ..log.log_core import gdrive as log
 from . import utils
+from .models.filesystem import FileSystem
 
 
 class GDriveFile:
@@ -96,10 +95,12 @@ class GoogleDriveClient:
         except (pydrive2.auth.InvalidConfigError, AttributeError):
             self.initialize()
 
-    def initialize(self) -> None:
-        service_account_file = Path(self.__service_account_file_path)
-        if service_account_file.exists() and not utils.is_empty_file(service_account_file):
-            log.credentials_json_exists(service_account_file)
+    def initialize(self, filesystem: Optional[FileSystem] = None) -> None:
+        filesystem = filesystem or FileSystem()
+
+        service_account_file_path = Path(self.__service_account_file_path)
+        if filesystem.exists(service_account_file_path) and not utils.is_empty_file(service_account_file_path, filesystem):
+            log.credentials_json_exists(service_account_file_path)
         else:
             GoogleDriveClient.create_service_account_credential_json(
                 self.__project_id,
@@ -109,22 +110,22 @@ class GoogleDriveClient:
                 self.__client_id,
                 self.__service_account_file_path,
             )
-            log.credentials_json_created(service_account_file)
+            log.credentials_json_created(service_account_file_path)
 
-        settings_file = Path(self.__settings_file_path)
-        if settings_file.exists() and not utils.is_empty_file(settings_file):
-            log.settings_yaml_exists(settings_file)
+        settings_file_path = Path(self.__settings_file_path)
+        if filesystem.exists(settings_file_path) and not utils.is_empty_file(settings_file_path, filesystem):
+            log.settings_yaml_exists(settings_file_path)
         else:
             GoogleDriveClient.create_service_account_settings_yaml(
-                self.__settings_file_path,
-                self.__service_account_file_path,
+                settings_file_path,
+                service_account_file_path,
                 self.__scopes,
             )
-            log.settings_yaml_created(settings_file)
+            log.settings_yaml_created(settings_file_path)
 
-        self.__gauth = pydrive2.auth.GoogleAuth(settings_file=settings_file.absolute())
+        self.__gauth = pydrive2.auth.GoogleAuth(settings_file=settings_file_path.absolute())
         credentials = pydrive2.auth.ServiceAccountCredentials.from_json_keyfile_name(
-            self.__service_account_file_path,
+            service_account_file_path,
             self.__scopes,
         )
         self.__gauth.credentials = credentials
@@ -138,6 +139,7 @@ class GoogleDriveClient:
         client_email: str,
         client_id: str,
         service_account_file_path: str,
+        filesystem: Optional[FileSystem] = None,
     ) -> None:
         contents = {
             "type": "service_account",
@@ -151,14 +153,16 @@ class GoogleDriveClient:
             "auth_provider_x509_cert_url": "https://www.googleapis.com/oauth2/v1/certs",
             "client_x509_cert_url": f"https://www.googleapis.com/robot/v1/metadata/x509/{urllib.parse.quote(client_email)}",
         }
-        with open(service_account_file_path, "w") as fp:
-            json.dump(contents, fp, indent=2)
+
+        filesystem = filesystem or FileSystem()
+        filesystem.dump_json(service_account_file_path, contents, indent=2)
 
     @staticmethod
     def create_service_account_settings_yaml(
         settings_file_path: str,
         service_account_file_path: str,
         scopes: list[str],
+        filesystem: Optional[FileSystem] = None,
     ) -> None:
         contents = {
             "client_config_backend": "file",
@@ -169,8 +173,8 @@ class GoogleDriveClient:
             "oauth_scope": scopes,
         }
 
-        with open(settings_file_path, "w+") as fp:
-            yaml.dump(contents, fp)
+        filesystem = filesystem or FileSystem()
+        filesystem.dump_yaml(settings_file_path, contents)
 
 
 class FromGoogleDriveFile:

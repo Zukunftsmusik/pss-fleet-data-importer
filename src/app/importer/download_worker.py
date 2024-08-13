@@ -13,6 +13,7 @@ from ..core import utils
 from ..core.gdrive import GDriveFile, GoogleDriveClient
 from ..core.models.cancellation_token import CancellationToken, OperationCancelledError
 from ..core.models.collection_file_change import CollectionFileChange
+from ..core.models.filesystem import FileSystem
 from ..core.models.status import StatusFlag
 from ..log.log_importer import download_worker as log
 from ..models.queue_item import CollectionFileQueueItem
@@ -129,7 +130,7 @@ def download_gdrive_file(
     log_stack_trace_on_download_error: bool,
     max_download_attempts: int = 5,
 ) -> Optional[CollectionFileQueueItem]:
-    if importer_utils.check_if_exists(queue_item.target_file_path, queue_item.item_no, queue_item.gdrive_file.size):
+    if importer_utils.check_if_exists(queue_item.target_file_path, queue_item.gdrive_file.size):
         queue_item.download_file_path = queue_item.target_file_path
         log.file_exists(queue_item.item_no, queue_item.download_file_path)
         return queue_item
@@ -209,26 +210,26 @@ def write_gdrive_file_to_disk(
     gdrive_file_name: str,
     gdrive_file_size: int,
     max_write_attempts: int,
+    filesystem: Optional[FileSystem] = None,
 ) -> tuple[Path, bool]:
     if file_contents:
+        filesystem = filesystem or FileSystem()
         download_error: IOError = None
 
         for _ in range(max_write_attempts):
             cancel_token.raise_if_cancelled("Cancelled download of file no. %i: %s", item_no, gdrive_file_name, log_level=logging.DEBUG)
 
             try:
-                with open(file_path, "w") as fp:
-                    fp.write(file_contents)
-
-                log.write_file_to_disk(item_no, file_path)
+                filesystem.write(file_path, file_contents)
             except IOError as exc:
                 download_error = exc
                 continue
 
+            log.write_file_to_disk(item_no, file_path)
             cancel_token.raise_if_cancelled("Cancelled download of file no. %i: %s", item_no, gdrive_file_name, log_level=logging.DEBUG)
 
             # It may take some time for the file contents to be flushed to disk
-            while not importer_utils.check_if_exists(file_path, item_no, gdrive_file_size):
+            while not importer_utils.check_if_exists(file_path, gdrive_file_size):
                 cancel_token.raise_if_cancelled("Cancelled download of file no. %i: %s", item_no, gdrive_file_name, log_level=logging.DEBUG)
 
                 time.sleep(0.1)

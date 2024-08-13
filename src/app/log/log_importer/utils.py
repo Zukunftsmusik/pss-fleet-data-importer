@@ -19,7 +19,7 @@ def does_not_exist(item_no: int, file_path: Union[Path, str]):
     LOGGER.debug("File no. %i does not exists at: %s", item_no, file_path)
 
 
-def file_sizes(item_no: int, file_size: int):
+def file_size(item_no: int, file_size: int):
     LOGGER.debug("File size of file no. %i is: %i", item_no, file_size)
 
 
