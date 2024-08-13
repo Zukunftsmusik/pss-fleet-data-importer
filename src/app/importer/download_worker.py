@@ -158,7 +158,6 @@ def download_gdrive_file(
             queue_item.cancel_token,
             queue_item.item_no,
             queue_item.gdrive_file.name,
-            queue_item.gdrive_file.size,
             max_download_attempts,
         )
     except IOError as download_error:
@@ -218,7 +217,6 @@ def write_gdrive_file_to_disk(
     cancel_token: CancellationToken,
     item_no: int,
     gdrive_file_name: str,
-    gdrive_file_size: int,
     max_write_attempts: int,
     filesystem: FileSystem = FileSystem(),
 ) -> tuple[Path, bool]:
@@ -233,15 +231,6 @@ def write_gdrive_file_to_disk(
             except IOError as exc:
                 download_error = exc
                 continue
-
-            log.write_file_to_disk(item_no, file_path)
-            cancel_token.raise_if_cancelled("Cancelled download of file no. %i: %s", item_no, gdrive_file_name, log_level=logging.DEBUG)
-
-            # It may take some time for the file contents to be flushed to disk
-            while not importer_utils.check_if_exists(file_path, gdrive_file_size):
-                cancel_token.raise_if_cancelled("Cancelled download of file no. %i: %s", item_no, gdrive_file_name, log_level=logging.DEBUG)
-
-                time.sleep(0.1)
 
             return file_path, False
 
