@@ -82,7 +82,7 @@ def mock_gdrive_client() -> FakeGoogleDriveClient:
 
 
 @pytest.fixture(scope="function")
-def mock_gdrive_file(
+def fake_gdrive_file(
     google_drive_file_id: str,
     google_drive_file_size: int,
     google_drive_file_content: str,
@@ -170,7 +170,7 @@ def collection_file_db(
 
 
 @pytest.fixture(scope="function")
-def queue_item(gdrive_file, collection_file_db) -> CollectionFileQueueItem:
+def queue_item(gdrive_file: GDriveFile, collection_file_db: CollectionFileDB) -> CollectionFileQueueItem:
     return CollectionFileQueueItem(1, gdrive_file, collection_file_db, "/dev/null", None)
 
 
@@ -192,3 +192,8 @@ def queue() -> Queue:
 @pytest.fixture(scope="function")
 def filesystem() -> FakeFileSystem:
     return FakeFileSystem()
+
+
+@pytest.fixture(scope="function")
+def fake_queue_item(fake_gdrive_file: FakeGDriveFile, collection_file_db: CollectionFileDB) -> CollectionFileQueueItem:
+    return CollectionFileQueueItem(1, fake_gdrive_file, collection_file_db, "/dev/null", None)

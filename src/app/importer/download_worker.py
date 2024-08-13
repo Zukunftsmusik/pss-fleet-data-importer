@@ -131,14 +131,11 @@ def download_gdrive_file(
     max_download_attempts: int = 3,
     filesystem: FileSystem = FileSystem(),
 ) -> Optional[CollectionFileQueueItem]:
-    if importer_utils.check_if_exists(queue_item.target_file_path, queue_item.gdrive_file.size, filesystem):
+    already_downloaded = file_already_downloaded(queue_item, filesystem=filesystem)
+
+    if already_downloaded:
         queue_item.download_file_path = queue_item.target_file_path
-        log.file_exists(queue_item.item_no, queue_item.download_file_path)
         return queue_item
-    else:
-        log.file_delete(queue_item.item_no)
-        # File also counts as not existing, if the file size differs from the file on gdrive
-        filesystem.delete(queue_item.target_file_path, missing_ok=True)
 
     try:
         file_contents = download_gdrive_file_contents(
@@ -170,6 +167,17 @@ def download_gdrive_file(
         raise DownloadFailedError(queue_item.gdrive_file.name, str(download_error), inner_exception=download_error) from download_error
 
     return queue_item
+
+
+def file_already_downloaded(queue_item: CollectionFileQueueItem, filesystem: FileSystem = FileSystem()) -> bool:
+    if importer_utils.check_if_exists(queue_item.target_file_path, queue_item.gdrive_file.size, filesystem):
+        log.file_exists(queue_item.item_no, queue_item.download_file_path)
+        return True
+
+    # File also counts as not existing, if the file size differs from the file on gdrive
+    log.file_delete(queue_item.item_no)
+    filesystem.delete(queue_item.target_file_path, missing_ok=True)
+    return False
 
 
 def download_gdrive_file_contents(
