@@ -26,7 +26,7 @@ async def worker(
     queue_item: CollectionFileQueueItem = None
     none_count = 0
 
-    while not cancel_token.cancelled:
+    while not cancel_token.cancelled and not none_count >= exit_after_none_count:
         try:
             queue_item = import_queue.get(block=False)
         except queue.Empty:
@@ -35,11 +35,7 @@ async def worker(
 
         if queue_item is None:
             none_count += 1
-
-            if none_count == exit_after_none_count:
-                break
-            else:
-                continue
+            continue
 
         if await skip_file_import_on_error(queue_item.item_no, queue_item):
             log.skip_file_error(queue_item.item_no, queue_item.gdrive_file.name)
