@@ -71,6 +71,9 @@ class FakeFileSystem:
     def load_json(self, path: Union[Path, str]) -> dict:
         return json.loads(self.read(path))
 
+    def mkdir(self, path: Union[Path, str]):
+        self.write(path, None)
+
     def read(self, path: Union[Path, str], _: str = "r") -> str:
         path = Path(path)
         if self.exists(path):
