@@ -1,8 +1,8 @@
 import pytest
 
-from mock_classes import MockConfig
+from tests.fake_classes import FakeConfig
 
 
 @pytest.fixture(scope="function")
-def mock_config() -> MockConfig:
-    return MockConfig()
+def mock_config() -> FakeConfig:
+    return FakeConfig()

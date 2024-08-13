@@ -4,7 +4,7 @@ import googleapiclient.errors
 import pydrive2.files
 import pytest
 
-from mock_classes import MockGDriveFile, MockGoogleDriveClient
+from tests.fake_classes import FakeGDriveFile, FakeGoogleDriveClient
 
 
 class MockResponse:
@@ -36,8 +36,8 @@ test_cases_log_exception = [
 
 @pytest.mark.parametrize(["exception_type"], test_cases_do_not_log_exception)
 def test_do_not_log_exception(
-    mock_gdrive_client: MockGoogleDriveClient,
-    mock_gdrive_file: MockGDriveFile,
+    mock_gdrive_client: FakeGoogleDriveClient,
+    mock_gdrive_file: FakeGDriveFile,
     exception_type: type[Exception],
     monkeypatch: pytest.MonkeyPatch,
     caplog: pytest.LogCaptureFixture,
@@ -45,7 +45,7 @@ def test_do_not_log_exception(
     def mock_get_content_string(*args):
         raise exception_type()
 
-    monkeypatch.setattr(MockGDriveFile, MockGDriveFile.get_content_string.__name__, mock_get_content_string)
+    monkeypatch.setattr(FakeGDriveFile, FakeGDriveFile.get_content_string.__name__, mock_get_content_string)
 
     with caplog.at_level(logging.WARNING):
         with pytest.raises(exception_type):
@@ -56,8 +56,8 @@ def test_do_not_log_exception(
 
 @pytest.mark.parametrize(["exception_type", "exception_instance"], test_cases_log_exception)
 def test_log_exception(
-    mock_gdrive_client: MockGoogleDriveClient,
-    mock_gdrive_file: MockGDriveFile,
+    mock_gdrive_client: FakeGoogleDriveClient,
+    mock_gdrive_file: FakeGDriveFile,
     exception_type: type[Exception],
     exception_instance: Exception,
     monkeypatch: pytest.MonkeyPatch,
@@ -66,7 +66,7 @@ def test_log_exception(
     def mock_get_content_string(*args):
         raise exception_instance
 
-    monkeypatch.setattr(MockGDriveFile, MockGDriveFile.get_content_string.__name__, mock_get_content_string)
+    monkeypatch.setattr(FakeGDriveFile, FakeGDriveFile.get_content_string.__name__, mock_get_content_string)
 
     with caplog.at_level(logging.WARNING):
         with pytest.raises(exception_type):
@@ -77,8 +77,8 @@ def test_log_exception(
 
 
 def test_returns_contents(
-    mock_gdrive_client: MockGoogleDriveClient,
-    mock_gdrive_file: MockGDriveFile,
+    mock_gdrive_client: FakeGoogleDriveClient,
+    mock_gdrive_file: FakeGDriveFile,
 ):
     result = mock_gdrive_client.get_file_contents(mock_gdrive_file)
     assert result == mock_gdrive_file.content

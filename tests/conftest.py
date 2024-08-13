@@ -12,13 +12,13 @@ import pydrive2.files
 import pytest
 from pydrive2.files import GoogleDriveFile
 
-from mock_classes import MockGDriveFile, MockGoogleDriveClient
 from src.app.core import config
 from src.app.core.gdrive import GDriveFile
 from src.app.core.models.status import StatusFlag
 from src.app.database.models import CollectionFileDB
 from src.app.models import CancellationToken
 from src.app.models.queue_item import CollectionFileQueueItem
+from tests.fake_classes import FakeGDriveFile, FakeGoogleDriveClient
 
 
 class MockHttpResponse:
@@ -77,8 +77,8 @@ def configuration() -> config.Config:
 
 
 @pytest.fixture(scope="function")
-def mock_gdrive_client() -> MockGoogleDriveClient:
-    return MockGoogleDriveClient()
+def mock_gdrive_client() -> FakeGoogleDriveClient:
+    return FakeGoogleDriveClient()
 
 
 @pytest.fixture(scope="function")
@@ -88,8 +88,8 @@ def mock_gdrive_file(
     google_drive_file_content: str,
     google_drive_file_name: str,
     google_drive_file_modified_date: datetime,
-) -> MockGDriveFile:
-    return MockGDriveFile(
+) -> FakeGDriveFile:
+    return FakeGDriveFile(
         google_drive_file_id,
         google_drive_file_name,
         google_drive_file_size,

@@ -1,14 +1,14 @@
 import pytest
 from pss_fleet_data import PssFleetDataClient
 
-from mock_classes import MockPssFleetDataClient
 from src.app.core import config
 from src.app.importer import Importer
+from tests.fake_classes import FakePssFleetDataClient
 
 
 @pytest.fixture(scope="function")
-def mock_fleet_data_client() -> MockPssFleetDataClient:
-    return MockPssFleetDataClient()
+def mock_fleet_data_client() -> FakePssFleetDataClient:
+    return FakePssFleetDataClient()
 
 
 @pytest.fixture(scope="function")

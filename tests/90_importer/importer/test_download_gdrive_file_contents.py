@@ -3,16 +3,16 @@ import logging
 import pydrive2.files
 import pytest
 
-from mock_classes import MockGDriveFile, MockGoogleDriveClient
 from src.app.core.gdrive import GoogleDriveClient
 from src.app.core.models.cancellation_token import OperationCancelledError
 from src.app.importer.download_worker import download_gdrive_file_contents
 from src.app.models import CancellationToken
+from tests.fake_classes import FakeGDriveFile, FakeGoogleDriveClient
 
 
 @pytest.mark.usefixtures("patch_time_sleep")
 def test_returns_contents(
-    mock_gdrive_file: MockGDriveFile,
+    mock_gdrive_file: FakeGDriveFile,
     mock_gdrive_client: GoogleDriveClient,
     cancel_token: CancellationToken,
     caplog: pytest.LogCaptureFixture,
@@ -36,8 +36,8 @@ test_cases_raised_error_caught = [
 @pytest.mark.usefixtures("patch_time_sleep")
 @pytest.mark.parametrize(["exception_type"], test_cases_raised_error_caught)
 def test_raised_error_caught(
-    mock_gdrive_file: MockGDriveFile,
-    mock_gdrive_client: MockGoogleDriveClient,
+    mock_gdrive_file: FakeGDriveFile,
+    mock_gdrive_client: FakeGoogleDriveClient,
     cancel_token: CancellationToken,
     google_api_errors: dict[type[Exception], Exception],
     exception_type: type[Exception],
@@ -47,7 +47,7 @@ def test_raised_error_caught(
     def mock_gdrive_client_get_file_contents(*args):
         raise google_api_errors[exception_type]
 
-    monkeypatch.setattr(MockGoogleDriveClient, MockGoogleDriveClient.get_file_contents.__name__, mock_gdrive_client_get_file_contents)
+    monkeypatch.setattr(FakeGoogleDriveClient, FakeGoogleDriveClient.get_file_contents.__name__, mock_gdrive_client_get_file_contents)
 
     item_no = 1337
 
@@ -74,7 +74,7 @@ test_cases_raised_error_not_caught = [
 @pytest.mark.usefixtures("patch_time_sleep")
 @pytest.mark.parametrize(["exception_type"], test_cases_raised_error_not_caught)
 def test_raised_error_not_caught(
-    mock_gdrive_file: MockGDriveFile,
+    mock_gdrive_file: FakeGDriveFile,
     mock_gdrive_client: GoogleDriveClient,
     cancel_token: CancellationToken,
     exception_type: type[Exception],
@@ -84,7 +84,7 @@ def test_raised_error_not_caught(
     def mock_gdrive_client_get_file_contents(*args):
         raise exception_type()
 
-    monkeypatch.setattr(MockGoogleDriveClient, MockGoogleDriveClient.get_file_contents.__name__, mock_gdrive_client_get_file_contents)
+    monkeypatch.setattr(FakeGoogleDriveClient, FakeGoogleDriveClient.get_file_contents.__name__, mock_gdrive_client_get_file_contents)
 
     item_no = 1337
 
@@ -98,8 +98,8 @@ def test_raised_error_not_caught(
 
 @pytest.mark.usefixtures("patch_time_sleep")
 def test_cancelled(
-    mock_gdrive_file: MockGDriveFile,
-    mock_gdrive_client: MockGoogleDriveClient,
+    mock_gdrive_file: FakeGDriveFile,
+    mock_gdrive_client: FakeGoogleDriveClient,
     cancel_token: CancellationToken,
     caplog: pytest.LogCaptureFixture,
 ):

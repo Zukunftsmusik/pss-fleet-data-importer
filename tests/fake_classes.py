@@ -9,16 +9,16 @@ from src.app.core.gdrive import GDriveFile, GoogleDriveClient
 
 
 @dataclass(frozen=False)
-class MockConfig(ConfigBase):
+class FakeConfig(ConfigBase):
     pass
 
 
-class MockGoogleDriveClient(GoogleDriveClient):
+class FakeGoogleDriveClient(GoogleDriveClient):
     def __init__(self):
         pass
 
 
-class MockGDriveFile(GDriveFile):
+class FakeGDriveFile(GDriveFile):
     def __init__(self, file_id: str, file_name: str, file_size: int, modified_date: datetime, content: str):
         self.id = file_id
         self.name = file_name
@@ -30,6 +30,10 @@ class MockGDriveFile(GDriveFile):
         return self.content
 
 
-class MockPssFleetDataClient(PssFleetDataClient):
+class FakePssFleetDataClient(PssFleetDataClient):
     def __init__(self):
         pass
+
+
+class FakeStatResult:
+    st_size: int

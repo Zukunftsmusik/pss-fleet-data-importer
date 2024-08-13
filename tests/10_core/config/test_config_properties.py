@@ -4,27 +4,27 @@ from typing import Optional
 
 import pytest
 
-from mock_classes import MockConfig
+from tests.fake_classes import FakeConfig
 
 
-def test_async_connection_string_well_formed(mock_config: MockConfig):
+def test_async_connection_string_well_formed(mock_config: FakeConfig):
     assert mock_config.db_async_connection_str.startswith("postgresql+asyncpg://")
     assert mock_config.db_url in mock_config.db_async_connection_str
     assert mock_config.db_name in mock_config.db_async_connection_str
 
 
-def test_sync_connection_string_well_formed(mock_config: MockConfig):
+def test_sync_connection_string_well_formed(mock_config: FakeConfig):
     assert mock_config.db_sync_connection_str.startswith("postgresql://")
     assert mock_config.db_url in mock_config.db_sync_connection_str
     assert mock_config.db_name in mock_config.db_sync_connection_str
 
 
-def test_db_server_and_port_correct(mock_config: MockConfig):
+def test_db_server_and_port_correct(mock_config: FakeConfig):
     mock_config.db_url = "user:password@127.0.0.1:8000"
     assert mock_config.db_server_and_port == "127.0.0.1:8000"
 
 
-def test_log_file_name_well_formed(mock_config: MockConfig):
+def test_log_file_name_well_formed(mock_config: FakeConfig):
     log_file_name = mock_config.log_file_name
 
     assert isinstance(log_file_name, str)
@@ -33,7 +33,7 @@ def test_log_file_name_well_formed(mock_config: MockConfig):
     assert len(log_file_name) == len("pss_fleet_data_importer_") + len(".log") + len("20240101-235900")
 
 
-def test_log_folder_path_is_set(mock_config: MockConfig):
+def test_log_folder_path_is_set(mock_config: FakeConfig):
     mock_path = "/dev/null"
     mock_config.log_folder = mock_path
 
@@ -43,7 +43,7 @@ def test_log_folder_path_is_set(mock_config: MockConfig):
     assert len(str(mock_config.log_file_path)) == len(mock_path) + 1 + len("pss_fleet_data_importer_") + len(".log") + len("20240101-235900")
 
 
-def test_log_folder_path_not_set(mock_config: MockConfig):
+def test_log_folder_path_not_set(mock_config: FakeConfig):
     mock_config.log_folder = None
 
     assert mock_config.log_folder_path is None
@@ -66,7 +66,7 @@ test_cases_log_level = [
 
 
 @pytest.mark.parametrize(["from_env", "debug_mode", "expected_result"], test_cases_log_level)
-def test_log_level_correct(mock_config: MockConfig, from_env: Optional[str], debug_mode: bool, expected_result: int):
+def test_log_level_correct(mock_config: FakeConfig, from_env: Optional[str], debug_mode: bool, expected_result: int):
     mock_config.log_level = from_env
     mock_config.debug_mode = debug_mode
 
