@@ -1,7 +1,7 @@
 import logging
 import logging.config
 import os
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Optional, dataclass_transform
@@ -27,7 +27,7 @@ class ConfigBase:
     gdrive_private_key: str = os.getenv("GDRIVE_SERVICE_PRIVATE_KEY")
     gdrive_client_email: str = os.getenv("GDRIVE_SERVICE_CLIENT_EMAIL")
     gdrive_client_id: str = os.getenv("GDRIVE_SERVICE_CLIENT_ID")
-    gdrive_scopes: list[str] = field(default_factory=lambda: ["https://www.googleapis.com/auth/drive"])
+    gdrive_scopes: list[str] = ["https://www.googleapis.com/auth/drive"]
     gdrive_folder_id: str = os.getenv("GDRIVE_FOLDER_ID", "10wOZgAQk_0St2Y_jC3UW497LVpBNxWmP")
     gdrive_service_account_file_path: str = "client_secrets.json"
     gdrive_settings_file_path: str = "settings.yaml"
