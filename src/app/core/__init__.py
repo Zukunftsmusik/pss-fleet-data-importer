@@ -1,4 +1,4 @@
-from . import config, gdrive, models, utils, wrapper
+from . import config, gdrive, models, utils
 
 
 __all__ = [
@@ -7,5 +7,4 @@ __all__ = [
     gdrive.__name__,
     models.__name__,
     utils.__name__,
-    wrapper.__name__,
 ]
