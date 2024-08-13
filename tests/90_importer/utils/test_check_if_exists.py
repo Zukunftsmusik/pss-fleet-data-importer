@@ -1,10 +1,5 @@
-import logging
 from pathlib import Path
-from typing import Optional
 
-import pytest
-
-from fake_classes import FakeStatResult
 from src.app.core.models.filesystem import FileSystem
 from src.app.importer.utils import check_if_exists
 

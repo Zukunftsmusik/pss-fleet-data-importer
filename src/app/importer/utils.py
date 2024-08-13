@@ -2,7 +2,6 @@ from pathlib import Path
 from typing import Optional, Union
 
 from ..core.models.filesystem import FileSystem
-from ..log.log_importer import utils as log
 
 
 def check_if_exists(
