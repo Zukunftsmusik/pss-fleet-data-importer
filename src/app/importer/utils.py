@@ -13,7 +13,6 @@ def check_if_exists(
 
     file_path = Path(file_path)
     if filesystem.exists(file_path):
-
         file_size = filesystem.get_size(file_path)
 
         if file_size == expected_file_size:
