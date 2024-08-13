@@ -14,31 +14,34 @@ async def worker(
     status_flag.value = True
     log.database_worker_started()
 
-    queue_item: CollectionFileQueueItem
-    change: CollectionFileChange
     none_count = 0
 
-    while not cancel_token.cancelled:
-        try:
-            queue_item, change = database_queue.get(block=False)
-        except queue.Empty:
-            await asyncio.sleep(0.1)
-            continue
-
-        if queue_item is None and change is None:
-            none_count += 1
-
-            if none_count == exit_after_none_count:
-                break
-            else:
-                continue
-
-        await update_queue_item(queue_item, change)
-
-        database_queue.task_done()
+    while not cancel_token.cancelled and not none_count >= exit_after_none_count:
+        none_count = await process_queue_item(database_queue, none_count)
 
     log.database_worker_ended(cancel_token)
     status_flag.value = False
+
+
+async def process_queue_item(database_queue: queue.Queue, none_count: int) -> int:
+    queue_item: CollectionFileQueueItem
+    change: CollectionFileChange
+
+    try:
+        queue_item, change = database_queue.get(block=False)
+    except queue.Empty:
+        await asyncio.sleep(0.1)
+        return none_count
+
+    if queue_item is None and change is None:
+        none_count += 1
+        database_queue.task_done()
+        return none_count
+
+    await update_queue_item(queue_item, change)
+
+    database_queue.task_done()
+    return none_count
 
 
 async def update_queue_item(queue_item: CollectionFileQueueItem, change: CollectionFileChange):

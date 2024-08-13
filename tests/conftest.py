@@ -5,6 +5,7 @@ import string
 import time
 import uuid
 from datetime import datetime
+from queue import Queue
 
 import googleapiclient.errors
 import pydrive2.files
@@ -14,6 +15,7 @@ from pydrive2.files import GoogleDriveFile
 from mock_classes import MockGDriveFile, MockGoogleDriveClient
 from src.app.core import config
 from src.app.core.gdrive import GDriveFile
+from src.app.core.models.status import StatusFlag
 from src.app.database.models import CollectionFileDB
 from src.app.models import CancellationToken
 from src.app.models.queue_item import CollectionFileQueueItem
@@ -170,3 +172,18 @@ def collection_file_db(
 @pytest.fixture(scope="function")
 def queue_item(gdrive_file, collection_file_db) -> CollectionFileQueueItem:
     return CollectionFileQueueItem(1, gdrive_file, collection_file_db, "/dev/null", None)
+
+
+@pytest.fixture(scope="function")
+def status_flag_false() -> StatusFlag:
+    return StatusFlag("false", False)
+
+
+@pytest.fixture(scope="function")
+def status_flag_true() -> StatusFlag:
+    return StatusFlag("true", True)
+
+
+@pytest.fixture(scope="function")
+def queue() -> Queue:
+    return Queue()
