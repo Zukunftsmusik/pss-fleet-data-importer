@@ -49,6 +49,13 @@ class FakeFileSystem:
         files = files or {}
         self.__files: dict[Path, str] = {Path(path): content for path, content in files.items()}
 
+    def delete(self, path: Union[Path, str], *, missing_ok: bool = False):
+        path = Path(path)
+        if missing_ok:
+            self.__files.pop(path, None)
+        else:
+            self.__files.pop(path)
+
     def exists(self, path: Union[Path, str]) -> bool:
         return Path(path) in self.__files.keys()
 

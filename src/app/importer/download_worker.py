@@ -128,14 +128,16 @@ def download_gdrive_file(
     queue_item: CollectionFileQueueItem,
     gdrive_client: GoogleDriveClient,
     log_stack_trace_on_download_error: bool,
-    max_download_attempts: int = 5,
+    max_download_attempts: int = 3,
+    filesystem: FileSystem = FileSystem(),
 ) -> Optional[CollectionFileQueueItem]:
-    if importer_utils.check_if_exists(queue_item.target_file_path, queue_item.gdrive_file.size):
+    if importer_utils.check_if_exists(queue_item.target_file_path, queue_item.gdrive_file.size, filesystem):
         queue_item.download_file_path = queue_item.target_file_path
         log.file_exists(queue_item.item_no, queue_item.download_file_path)
         return queue_item
     else:
         log.file_delete(queue_item.item_no)
+        filesystem.delete(queue_item.target_file_path, missing_ok=True)
         queue_item.target_file_path.unlink(missing_ok=True)  # File also counts as not existing, if the file size differs from the file on gdrive
 
     try:
@@ -210,10 +212,9 @@ def write_gdrive_file_to_disk(
     gdrive_file_name: str,
     gdrive_file_size: int,
     max_write_attempts: int,
-    filesystem: Optional[FileSystem] = None,
+    filesystem: FileSystem = FileSystem(),
 ) -> tuple[Path, bool]:
     if file_contents:
-        filesystem = filesystem or FileSystem()
         download_error: IOError = None
 
         for _ in range(max_write_attempts):

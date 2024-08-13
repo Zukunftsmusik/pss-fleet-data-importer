@@ -6,6 +6,9 @@ import yaml
 
 
 class FileSystem:
+    def delete(self, path: Union[Path, str], *, missing_ok: bool = False):
+        Path(path).unlink(missing_ok=missing_ok)
+
     def exists(self, path: Union[Path, str]) -> bool:
         return Path(path).exists()
 

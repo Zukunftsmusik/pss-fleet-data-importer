@@ -1,7 +1,6 @@
 import asyncio
 import queue
 from datetime import datetime, timezone
-from typing import Optional
 
 from pss_fleet_data import PssFleetDataClient
 from pss_fleet_data.core.exceptions import ApiError, NonUniqueTimestampError
@@ -77,7 +76,7 @@ async def import_file(fleet_data_client: PssFleetDataClient, queue_item: Collect
     return imported_at
 
 
-async def skip_file_import_on_error(file_no: int, queue_item: CollectionFileQueueItem, filesystem: Optional[FileSystem] = None) -> bool:
+async def skip_file_import_on_error(file_no: int, queue_item: CollectionFileQueueItem, filesystem: FileSystem = FileSystem()) -> bool:
     if queue_item.cancel_token.cancelled:
         return True
 
@@ -85,7 +84,6 @@ async def skip_file_import_on_error(file_no: int, queue_item: CollectionFileQueu
         log.skip_file_import_download_error(file_no, queue_item.gdrive_file.name)
         return True
 
-    filesystem = filesystem or FileSystem()
     contents = filesystem.load_json(queue_item.download_file_path)
     if not contents:
         log.skip_file_import_empty_json(file_no, queue_item.download_file_path)

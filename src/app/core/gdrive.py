@@ -95,9 +95,7 @@ class GoogleDriveClient:
         except (pydrive2.auth.InvalidConfigError, AttributeError):
             self.initialize()
 
-    def initialize(self, filesystem: Optional[FileSystem] = None) -> None:
-        filesystem = filesystem or FileSystem()
-
+    def initialize(self, filesystem: FileSystem = FileSystem()) -> None:
         service_account_file_path = Path(self.__service_account_file_path)
         if filesystem.exists(service_account_file_path) and not utils.is_empty_file(service_account_file_path, filesystem):
             log.credentials_json_exists(service_account_file_path)
@@ -139,7 +137,7 @@ class GoogleDriveClient:
         client_email: str,
         client_id: str,
         service_account_file_path: str,
-        filesystem: Optional[FileSystem] = None,
+        filesystem: FileSystem = FileSystem(),
     ) -> None:
         contents = {
             "type": "service_account",
@@ -154,7 +152,6 @@ class GoogleDriveClient:
             "client_x509_cert_url": f"https://www.googleapis.com/robot/v1/metadata/x509/{urllib.parse.quote(client_email)}",
         }
 
-        filesystem = filesystem or FileSystem()
         filesystem.dump_json(service_account_file_path, contents, indent=2)
 
     @staticmethod
@@ -162,7 +159,7 @@ class GoogleDriveClient:
         settings_file_path: str,
         service_account_file_path: str,
         scopes: list[str],
-        filesystem: Optional[FileSystem] = None,
+        filesystem: FileSystem = FileSystem(),
     ) -> None:
         contents = {
             "client_config_backend": "file",
@@ -173,7 +170,6 @@ class GoogleDriveClient:
             "oauth_scope": scopes,
         }
 
-        filesystem = filesystem or FileSystem()
         filesystem.dump_yaml(settings_file_path, contents)
 
 

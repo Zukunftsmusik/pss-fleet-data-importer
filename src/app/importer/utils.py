@@ -1,5 +1,5 @@
 from pathlib import Path
-from typing import Optional, Union
+from typing import Union
 
 from ..core.models.filesystem import FileSystem
 
@@ -7,9 +7,8 @@ from ..core.models.filesystem import FileSystem
 def check_if_exists(
     file_path: Union[Path, str],
     expected_file_size: int,
-    filesystem: Optional[FileSystem] = None,
+    filesystem: FileSystem = FileSystem(),
 ) -> bool:
-    filesystem = filesystem or FileSystem()
 
     file_path = Path(file_path)
     if filesystem.exists(file_path):

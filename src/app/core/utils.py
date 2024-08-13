@@ -77,8 +77,7 @@ def get_now() -> datetime:
     return remove_timezone(datetime.now(tz=timezone.utc))
 
 
-def is_empty_file(file_path: Union[Path, str], filesystem: Optional[FileSystem] = None) -> bool:
-    filesystem = filesystem or FileSystem()
+def is_empty_file(file_path: Union[Path, str], filesystem: FileSystem = FileSystem()) -> bool:
     return filesystem.get_size(file_path) == 0
 
 
