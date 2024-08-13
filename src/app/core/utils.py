@@ -1,13 +1,27 @@
 import asyncio
 import threading
-from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any, Awaitable, Callable, Iterable, Mapping, Optional, Union
 
-from .models.cancellation_token import CancellationToken
 from .models.filesystem import FileSystem
-from .models.status import StatusFlag
+
+
+def create_async_thread(
+    coro: Callable[..., Awaitable[Any]],
+    name: str = None,
+    args: Iterable[Any] = None,
+    kwargs: Mapping[str, Any] = None,
+    daemon: bool = True,
+) -> threading.Thread:
+    args = args or ()
+    kwargs = kwargs or {}
+
+    def target():
+        asyncio.run(coro(*args, **kwargs))
+
+    thread = threading.Thread(target=target, name=name, daemon=daemon)
+    return thread
 
 
 def extract_timestamp_from_gdrive_file_name(file_name: str) -> datetime:
@@ -86,49 +100,11 @@ def remove_timezone(dt: Optional[datetime]) -> datetime:
     return dt.replace(tzinfo=None)
 
 
-def start_pooled_bulk_operation(
-    thread_pool_size: int,
-    worker_func: Callable,
-    worker_items: Iterable[Any],
-    cancel_token: CancellationToken = None,
-    status_flag: StatusFlag = None,
-):
-    if status_flag is not None:
-        status_flag.value = True
-
-    with ThreadPoolExecutor(thread_pool_size) as executor:
-        for item in worker_items:
-            if cancel_token and cancel_token.cancelled:
-                return
-
-            executor.submit(worker_func, item)
-
-    if status_flag is not None:
-        status_flag.value = False
-
-
-def create_async_thread(
-    coro: Callable[..., Awaitable[Any]],
-    name: str = None,
-    args: Iterable[Any] = None,
-    kwargs: Mapping[str, Any] = None,
-    daemon: bool = True,
-) -> threading.Thread:
-    args = args or ()
-    kwargs = kwargs or {}
-
-    def target():
-        asyncio.run(coro(*args, **kwargs))
-
-    thread = threading.Thread(target=target, name=name, daemon=daemon)
-    return thread
-
-
 __all__ = [
     create_async_thread.__name__,
     extract_timestamp_from_gdrive_file_name.__name__,
     get_next_full_hour.__name__,
     get_now.__name__,
+    is_empty_file.__name__,
     remove_timezone.__name__,
-    start_pooled_bulk_operation.__name__,
 ]
