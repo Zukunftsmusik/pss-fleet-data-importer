@@ -11,6 +11,7 @@ from ..converters import FromCollectionFileDB, FromGdriveFile
 from ..core import utils
 from ..core.config import Config
 from ..core.gdrive import GDriveFile, GoogleDriveClient
+from ..core.models.filesystem import FileSystem
 from ..database import DatabaseRepository, crud
 from ..database.models import CollectionFileDB
 from ..log.log_importer import importer as log
@@ -90,7 +91,7 @@ class Importer:
         queue_items = FromCollectionFileDB.to_queue_items(gdrive_files, collection_files, self.config.temp_download_folder, self.status.cancel_token)
 
         log.download_folder_create(self.config.temp_download_folder)
-        self.config.temp_download_folder.mkdir(parents=True, exist_ok=True)
+        FileSystem().mkdir(self.config.temp_download_folder, create_parents=True, exist_ok=True)
 
         log.downloads_imports_count(queue_items)
 

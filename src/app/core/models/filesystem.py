@@ -27,6 +27,9 @@ class FileSystem:
         with open(path, "r") as fp:
             return json.load(fp)
 
+    def mkdir(self, path: Union[Path, str], mode: int = 511, create_parents: bool = False, exist_ok: bool = False):
+        Path(path).mkdir(mode=mode, parents=create_parents, exist_ok=exist_ok)
+
     def read(self, path: Union[Path, str], mode: str = "r") -> str:
         with open(path, mode) as fp:
             return fp.read()

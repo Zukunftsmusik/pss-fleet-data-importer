@@ -7,6 +7,7 @@ from typing import Optional, Union
 from httpx import URL
 
 from ..core.config import Config
+from ..core.models.filesystem import FileSystem
 from . import LOGGER_BASE, filter
 
 
@@ -14,11 +15,11 @@ def aborted():
     LOGGER_BASE.warn("\nAborted by user, shutting down.")
 
 
-def configure_logging(logging_config: dict, log_folder_path: Optional[Union[Path, str]]):
+def configure_logging(logging_config: dict, log_folder_path: Optional[Union[Path, str]], filesystem: FileSystem = FileSystem()):
     logging.config.dictConfig(dict(logging_config))
     logging.Formatter.converter = time.gmtime
     if log_folder_path:
-        log_folder_path.mkdir(parents=True, exist_ok=True)
+        filesystem.mkdir(log_folder_path, create_parents=True, exist_ok=True)
 
 
 def configure_logging_from_app_config(app_config: Config):
