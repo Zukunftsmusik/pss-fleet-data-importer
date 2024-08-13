@@ -5,7 +5,7 @@ from datetime import datetime  # noqa
 
 from pss_fleet_data import PssFleetDataClient
 
-from .. import __version__
+from ..app import __version__
 from .core import config
 from .core.gdrive import GoogleDriveClient
 from .importer import Importer
