@@ -22,7 +22,7 @@ class FileSystem:
 
     def load_json(self, path: Union[Path, str]) -> dict:
         with open(path, "r") as fp:
-            json.load(fp)
+            return json.load(fp)
 
     def read(self, path: Union[Path, str], mode: str = "r") -> str:
         with open(path, mode) as fp:
