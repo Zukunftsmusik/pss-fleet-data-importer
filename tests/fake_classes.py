@@ -65,6 +65,7 @@ class FakeFileSystem:
         return json.loads(self.read(path))
 
     def read(self, path: Union[Path, str], _: str = "r") -> str:
+        path = Path(path)
         if self.exists(path):
             return self.__files[path]
         raise FileNotFoundError()
