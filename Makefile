@@ -28,7 +28,7 @@ format:
 # testing
 .PHONY: coverage
 coverage:
-	pytest --cov=./src/app --cov-report=xml:cov.xml --cov-report=term
+	pytest --cov-config=.coveragerc --cov=./src/app --cov-report=xml --cov-report=term
 
 .PHONY: test
 test:
