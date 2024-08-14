@@ -1,3 +1,4 @@
+import logging
 from concurrent.futures import ThreadPoolExecutor
 from itertools import repeat
 
@@ -40,3 +41,20 @@ def test_output_count_does_not_equal_input_count_if_cancelled(
     futures = setup_futures(thread_pool_executor_1, queue_items, download_function, cancel_token=cancel_token)
 
     assert len(queue_items) > len(futures)
+
+
+def test_logs_once_if_cancelled_then_quits(
+    queue_item: CollectionFileQueueItem,
+    thread_pool_executor_1: ThreadPoolExecutor,
+    download_function: DownloadFunction,
+    cancel_token: CancellationToken,
+    caplog: pytest.LogCaptureFixture,
+):
+    queue_items = [queue_item]
+    cancel_token.cancel()
+
+    with caplog.at_level(logging.WARN):
+        _ = setup_futures(thread_pool_executor_1, queue_items, download_function, cancel_token=cancel_token)
+
+    assert "Requested cancellation" in caplog.text
+    assert len(caplog.records) == 1
