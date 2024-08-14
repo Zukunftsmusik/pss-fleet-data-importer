@@ -6,7 +6,7 @@ import pytest
 
 from src.app.core.models.cancellation_token import CancellationToken
 from src.app.importer.download_worker import DownloadFunction, setup_futures
-from src.app.models.queue_item import CollectionFileQueueItem
+from src.app.models.queue_item import QueueItem
 
 
 test_cases_input_count = [pytest.param(i, id=str(i)) for i in range(1, 11)]
@@ -14,7 +14,7 @@ test_cases_input_count = [pytest.param(i, id=str(i)) for i in range(1, 11)]
 
 @pytest.mark.parametrize(["input_count"], test_cases_input_count)
 def test_output_count_equals_input_count(
-    queue_item: CollectionFileQueueItem,
+    queue_item: QueueItem,
     thread_pool_executor_1: ThreadPoolExecutor,
     download_function: DownloadFunction,
     cancel_token: CancellationToken,
@@ -29,7 +29,7 @@ def test_output_count_equals_input_count(
 
 @pytest.mark.parametrize(["input_count"], test_cases_input_count)
 def test_output_count_does_not_equal_input_count_if_cancelled(
-    queue_item: CollectionFileQueueItem,
+    queue_item: QueueItem,
     thread_pool_executor_1: ThreadPoolExecutor,
     download_function: DownloadFunction,
     cancel_token: CancellationToken,
@@ -44,7 +44,7 @@ def test_output_count_does_not_equal_input_count_if_cancelled(
 
 
 def test_logs_once_if_cancelled_then_quits(
-    queue_item: CollectionFileQueueItem,
+    queue_item: QueueItem,
     thread_pool_executor_1: ThreadPoolExecutor,
     download_function: DownloadFunction,
     cancel_token: CancellationToken,

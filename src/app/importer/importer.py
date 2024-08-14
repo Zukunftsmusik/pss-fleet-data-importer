@@ -15,7 +15,7 @@ from ..core.models.filesystem import FileSystem
 from ..database import DatabaseRepository, crud
 from ..database.models import CollectionFileDB
 from ..log.log_importer import importer as log
-from ..models import CollectionFileQueueItem, ImportStatus
+from ..models import ImportStatus, QueueItem
 from . import database_worker, download_worker, import_worker
 
 
@@ -110,7 +110,7 @@ class Importer:
 
         return True
 
-    def create_worker_threads(self, queue_items: Iterable[CollectionFileQueueItem], filesystem: FileSystem = FileSystem()) -> list[threading.Thread]:
+    def create_worker_threads(self, queue_items: Iterable[QueueItem], filesystem: FileSystem = FileSystem()) -> list[threading.Thread]:
         worker_threads = [
             threading.Thread(
                 target=download_worker.worker,

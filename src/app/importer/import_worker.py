@@ -8,7 +8,7 @@ from pss_fleet_data.core.exceptions import ApiError, NonUniqueTimestampError
 from ..core import utils
 from ..core.models.filesystem import FileSystem
 from ..log.log_importer import import_worker as log
-from ..models import CancellationToken, CollectionFileChange, CollectionFileQueueItem, StatusFlag
+from ..models import CancellationToken, CollectionFileChange, QueueItem, StatusFlag
 
 
 async def worker(
@@ -24,7 +24,7 @@ async def worker(
     status_flag.value = True
     log.import_worker_started()
 
-    queue_item: CollectionFileQueueItem = None
+    queue_item: QueueItem = None
     none_count = 0
 
     while not cancel_token.cancelled and not none_count >= exit_after_none_count:
@@ -43,7 +43,7 @@ async def worker(
             import_queue.task_done()
             continue
 
-        log.import_start(queue_item.item_no, queue_item.download_file_path)
+        log.import_start(queue_item.item_no, queue_item.target_file_path)
 
         try:
             imported_at = await import_file(fleet_data_client, queue_item)
@@ -54,7 +54,7 @@ async def worker(
         database_queue.put((queue_item, CollectionFileChange(imported_at=imported_at)))
 
         if not keep_downloaded_files:
-            filesystem.delete(queue_item.download_file_path, missing_ok=True)
+            filesystem.delete(queue_item.target_file_path, missing_ok=True)
 
         import_queue.task_done()
 
@@ -64,20 +64,20 @@ async def worker(
     status_flag.value = False
 
 
-async def import_file(fleet_data_client: PssFleetDataClient, queue_item: CollectionFileQueueItem) -> datetime:
+async def import_file(fleet_data_client: PssFleetDataClient, queue_item: QueueItem) -> datetime:
     try:
-        collection_metadata = await fleet_data_client.upload_collection(queue_item.download_file_path)
+        collection_metadata = await fleet_data_client.upload_collection(queue_item.target_file_path)
         imported_at = utils.remove_timezone(datetime.now(tz=timezone.utc))
-        log.file_import_completed(queue_item.item_no, queue_item.download_file_path, collection_metadata.collection_id)
+        log.file_import_completed(queue_item.item_no, queue_item.target_file_path, collection_metadata.collection_id)
     except NonUniqueTimestampError:
         imported_at = utils.remove_timezone(datetime.now(tz=timezone.utc))
         collection_metadata = await fleet_data_client.get_most_recent_collection_metadata_by_timestamp(queue_item.collection_file.timestamp)
-        log.file_import_skipped(queue_item.item_no, queue_item.download_file_path, collection_metadata.collection_id)
+        log.file_import_skipped(queue_item.item_no, queue_item.target_file_path, collection_metadata.collection_id)
 
     return imported_at
 
 
-async def skip_file_import_on_error(file_no: int, queue_item: CollectionFileQueueItem, filesystem: FileSystem = FileSystem()) -> bool:
+async def skip_file_import_on_error(file_no: int, queue_item: QueueItem, filesystem: FileSystem = FileSystem()) -> bool:
     if queue_item.cancel_token.cancelled:
         return True
 
@@ -85,9 +85,9 @@ async def skip_file_import_on_error(file_no: int, queue_item: CollectionFileQueu
         log.skip_file_import_download_error(file_no, queue_item.gdrive_file.name)
         return True
 
-    contents = filesystem.load_json(queue_item.download_file_path)
+    contents = filesystem.load_json(queue_item.target_file_path)
     if not contents:
-        log.skip_file_import_empty_json(file_no, queue_item.download_file_path)
+        log.skip_file_import_empty_json(file_no, queue_item.target_file_path)
         return True
 
     return False

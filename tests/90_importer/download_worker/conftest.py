@@ -4,7 +4,7 @@ import pytest
 
 from src.app.core.models.cancellation_token import CancellationToken
 from src.app.importer.download_worker import DownloadFunction
-from src.app.models.queue_item import CollectionFileQueueItem
+from src.app.models.queue_item import QueueItem
 
 
 @pytest.fixture(scope="function")
@@ -34,7 +34,7 @@ def thread_pool_executor_5() -> ThreadPoolExecutor:
 
 @pytest.fixture()
 def download_function() -> DownloadFunction:
-    def func(queue_item: CollectionFileQueueItem, *args, cancel_token: CancellationToken, **kwargs):
+    def func(queue_item: QueueItem, *args, cancel_token: CancellationToken, **kwargs):
         if cancel_token and cancel_token.cancelled:
             return None
         return queue_item

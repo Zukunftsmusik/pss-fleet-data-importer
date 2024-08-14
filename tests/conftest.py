@@ -17,7 +17,7 @@ from src.app.core.gdrive import GDriveFile
 from src.app.core.models.status import StatusFlag
 from src.app.database.models import CollectionFileDB
 from src.app.models import CancellationToken
-from src.app.models.queue_item import CollectionFileQueueItem
+from src.app.models.queue_item import QueueItem
 from tests.fake_classes import FakeFileSystem, FakeGDriveFile, FakeGoogleDriveClient
 
 
@@ -170,8 +170,8 @@ def collection_file_db(
 
 
 @pytest.fixture(scope="function")
-def queue_item(gdrive_file: GDriveFile, collection_file_db: CollectionFileDB) -> CollectionFileQueueItem:
-    return CollectionFileQueueItem(1, gdrive_file, collection_file_db, "/dev/null", None)
+def queue_item(gdrive_file: GDriveFile, collection_file_db: CollectionFileDB) -> QueueItem:
+    return QueueItem(1, gdrive_file, collection_file_db, "/dev/null", None)
 
 
 @pytest.fixture(scope="function")
@@ -195,5 +195,5 @@ def filesystem() -> FakeFileSystem:
 
 
 @pytest.fixture(scope="function")
-def fake_queue_item(fake_gdrive_file: FakeGDriveFile, collection_file_db: CollectionFileDB) -> CollectionFileQueueItem:
-    return CollectionFileQueueItem(1, fake_gdrive_file, collection_file_db, "/dev/null", None)
+def fake_queue_item(fake_gdrive_file: FakeGDriveFile, collection_file_db: CollectionFileDB) -> QueueItem:
+    return QueueItem(1, fake_gdrive_file, collection_file_db, "/dev/null", None)

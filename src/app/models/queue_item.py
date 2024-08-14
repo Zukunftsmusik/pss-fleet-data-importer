@@ -10,7 +10,7 @@ from ..database.db_repository import DatabaseRepository
 from ..database.models import CollectionFileDB
 
 
-class CollectionFileQueueItem:
+class QueueItem:
     def __init__(
         self,
         item_no: int,
@@ -24,8 +24,8 @@ class CollectionFileQueueItem:
         self.gdrive_file: GDriveFile = gdrive_file
         self.__collection_file: CollectionFileDB = collection_file
         self.__collection_file_lock: Lock = Lock()
-        self.__download_file_path: Path = None
-        self.__download_file_path_lock: Lock = Lock()
+        self.__downloaded: bool = None
+        self.__downloaded_lock: Lock = Lock()
         self.__target_directory_path: Path = Path(target_directory)
         self.__error_while_downloading: bool = False
         self.__error_while_downloading_lock: Lock = Lock()
@@ -41,17 +41,14 @@ class CollectionFileQueueItem:
             self.__collection_file = value
 
     @property
-    def download_file_path(self) -> Path:
-        with self.__download_file_path_lock:
-            return self.__download_file_path
+    def downloaded(self) -> bool:
+        with self.__downloaded_lock:
+            return self.__downloaded
 
-    @download_file_path.setter
-    def download_file_path(self, value: Union[Path, str]):
-        with self.__download_file_path_lock:
-            if value:
-                self.__download_file_path = Path(value)
-            else:
-                self.__download_file_path = None
+    @downloaded.setter
+    def downloaded(self, value: bool):
+        with self.__downloaded_lock:
+            self.__downloaded = value
 
     @property
     def error_while_downloading(self) -> bool:
@@ -90,5 +87,5 @@ class CollectionFileQueueItem:
 
 
 __all__ = [
-    CollectionFileQueueItem.__name__,
+    QueueItem.__name__,
 ]

@@ -4,7 +4,7 @@ from typing import Iterable
 from ..core.gdrive import GDriveFile
 from ..core.models.cancellation_token import CancellationToken
 from ..database.models import CollectionFileDB
-from ..models.queue_item import CollectionFileQueueItem
+from ..models.queue_item import QueueItem
 
 
 class FromCollectionFileDB:
@@ -14,7 +14,7 @@ class FromCollectionFileDB:
         collection_files: Iterable[CollectionFileDB],
         target_directory: Path,
         cancel_token: CancellationToken,
-    ) -> list[CollectionFileQueueItem]:
+    ) -> list[QueueItem]:
         gdrive_files_by_id = {gdrive_file.id: gdrive_file for gdrive_file in gdrive_files}
         collection_files_by_gdrive_file_id = {collection_file.gdrive_file_id: collection_file for collection_file in collection_files}
 
@@ -22,7 +22,7 @@ class FromCollectionFileDB:
             raise ValueError
 
         result = [
-            CollectionFileQueueItem(
+            QueueItem(
                 item_no,
                 gdrive_files_by_id[gdrive_file_id],
                 collection_files_by_gdrive_file_id[gdrive_file_id],

@@ -4,14 +4,14 @@ from pathlib import Path
 from typing import Optional, Union
 
 from ...core.models.cancellation_token import CancellationToken
-from ...models.queue_item import CollectionFileQueueItem
+from ...models.queue_item import QueueItem
 from .. import LOGGER_BASE
 
 
 LOGGER = LOGGER_BASE.getChild("Importer")
 
 
-def bulk_import_finish(queue_items: list[CollectionFileQueueItem], modified_after: Optional[datetime], modified_before: Optional[datetime]):
+def bulk_import_finish(queue_items: list[QueueItem], modified_after: Optional[datetime], modified_before: Optional[datetime]):
     total_item_count = len(queue_items)
     downloaded_item_count = len([queue_item for queue_item in queue_items if queue_item.collection_file.downloaded_at])
     imported_item_count = len([queue_item for queue_item in queue_items if queue_item.collection_file.imported_at])
@@ -91,7 +91,7 @@ def download_gdrive_file_list_params(modified_after: Optional[datetime], modifie
         LOGGER.info("Retrieving all gdrive files.")
 
 
-def downloads_imports_count(queue_items: list[CollectionFileQueueItem]):
+def downloads_imports_count(queue_items: list[QueueItem]):
     download_count = len([_ for _ in queue_items if _.collection_file.downloaded_at is None])
     import_count = len([_ for _ in queue_items if _.collection_file.imported_at is None])
     LOGGER.info(f"Downloading {download_count} Collection files and importing {import_count} Collection files.")

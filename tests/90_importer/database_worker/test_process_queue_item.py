@@ -5,7 +5,7 @@ import pytest
 
 from src.app.core.models.collection_file_change import CollectionFileChange
 from src.app.importer.database_worker import process_queue_item
-from src.app.models.queue_item import CollectionFileQueueItem
+from src.app.models.queue_item import QueueItem
 
 
 async def test_returns_none_count_on_empty_queue(queue: Queue):
@@ -24,7 +24,7 @@ async def test_returns_none_count_plus_1_on_none_in_queue(queue: Queue):
 
 
 @pytest.mark.usefixtures("patch_crud_save_collection")
-async def test_updates_queue_item(queue: Queue, queue_item: CollectionFileQueueItem):
+async def test_updates_queue_item(queue: Queue, queue_item: QueueItem):
     downloaded_at = datetime(2024, 8, 1)
     change = CollectionFileChange(downloaded_at=downloaded_at)
     queue.put((queue_item, change))
@@ -40,7 +40,7 @@ async def test_updates_queue_item(queue: Queue, queue_item: CollectionFileQueueI
 
 
 @pytest.mark.usefixtures("patch_crud_save_collection")
-async def test_notifies_task_done(queue: Queue, queue_item: CollectionFileQueueItem):
+async def test_notifies_task_done(queue: Queue, queue_item: QueueItem):
     downloaded_at = datetime(2024, 8, 1)
     change = CollectionFileChange(downloaded_at=downloaded_at)
 

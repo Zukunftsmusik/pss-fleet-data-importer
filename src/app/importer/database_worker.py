@@ -2,7 +2,7 @@ import asyncio
 import queue
 
 from ..log.log_importer import database_worker as log
-from ..models import CancellationToken, CollectionFileChange, CollectionFileQueueItem, StatusFlag
+from ..models import CancellationToken, CollectionFileChange, QueueItem, StatusFlag
 
 
 async def worker(
@@ -24,7 +24,7 @@ async def worker(
 
 
 async def process_queue_item(database_queue: queue.Queue, none_count: int) -> int:
-    queue_item: CollectionFileQueueItem
+    queue_item: QueueItem
     change: CollectionFileChange
 
     try:
@@ -44,6 +44,6 @@ async def process_queue_item(database_queue: queue.Queue, none_count: int) -> in
     return none_count
 
 
-async def update_queue_item(queue_item: CollectionFileQueueItem, change: CollectionFileChange):
+async def update_queue_item(queue_item: QueueItem, change: CollectionFileChange):
     await queue_item.update_collection_file(change)
     log.queue_item_update(queue_item.item_no, change)

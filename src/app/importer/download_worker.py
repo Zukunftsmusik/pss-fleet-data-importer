@@ -16,18 +16,18 @@ from ..core.models.collection_file_change import CollectionFileChange
 from ..core.models.filesystem import FileSystem
 from ..core.models.status import StatusFlag
 from ..log.log_importer import download_worker as log
-from ..models.queue_item import CollectionFileQueueItem
+from ..models.queue_item import QueueItem
 from . import utils as importer_utils
 from .exceptions import DownloadFailedError
 
 
 class DownloadFunction(Protocol):
-    def __call__(self, queue_item: CollectionFileQueueItem, *args, cancel_token: CancellationToken, **kwargs) -> CollectionFileQueueItem:
+    def __call__(self, queue_item: QueueItem, *args, cancel_token: CancellationToken, **kwargs) -> QueueItem:
         pass
 
 
 def worker(
-    queue_items: Iterable[CollectionFileQueueItem],
+    queue_items: Iterable[QueueItem],
     gdrive_client: GoogleDriveClient,
     thread_pool_size: int,
     database_queue: queue.Queue,
@@ -105,7 +105,7 @@ def wait_for_download(
     executor: ThreadPoolExecutor,
     worker_timed_out_flag: StatusFlag,
     timeout: float = 60,
-) -> Optional[CollectionFileQueueItem]:
+) -> Optional[QueueItem]:
     try:
         return future.result(timeout)
     except (CancelledError, OperationCancelledError):
@@ -123,7 +123,7 @@ def wait_for_download(
 
 def setup_futures(
     executor: ThreadPoolExecutor,
-    queue_items: Iterable[CollectionFileQueueItem],
+    queue_items: Iterable[QueueItem],
     func: DownloadFunction,
     cancel_token: Optional[CancellationToken] = None,
     additional_func_args: Optional[Iterable[Any]] = None,
@@ -141,16 +141,16 @@ def setup_futures(
 
 
 def download_gdrive_file(
-    queue_item: CollectionFileQueueItem,
+    queue_item: QueueItem,
     gdrive_client: GoogleDriveClient,
     log_stack_trace_on_download_error: bool,
     max_download_attempts: int = 3,
     filesystem: FileSystem = FileSystem(),
-) -> Optional[CollectionFileQueueItem]:
+) -> Optional[QueueItem]:
     already_downloaded = file_already_downloaded(queue_item, filesystem=filesystem)
 
     if already_downloaded:
-        queue_item.download_file_path = queue_item.target_file_path
+        queue_item.downloaded = True
         return queue_item
 
     try:
@@ -163,12 +163,12 @@ def download_gdrive_file(
             log_stack_trace_on_download_error,
         )
     except (pydrive2.files.ApiRequestError, pydrive2.files.FileNotDownloadableError) as download_error:
-        queue_item.download_file_path = None
+        queue_item.downloaded = False
         queue_item.error_while_downloading = True
         raise DownloadFailedError(queue_item.gdrive_file.name, str(download_error), inner_exception=download_error) from download_error
 
     try:
-        queue_item.download_file_path, queue_item.error_while_downloading = write_gdrive_file_to_disk(
+        queue_item.downloaded, queue_item.error_while_downloading = write_gdrive_file_to_disk(
             file_contents,
             queue_item.target_file_path,
             queue_item.cancel_token,
@@ -177,16 +177,16 @@ def download_gdrive_file(
             max_download_attempts,
         )
     except IOError as download_error:
-        queue_item.download_file_path = None
+        queue_item.downloaded = False
         queue_item.error_while_downloading = True
         raise DownloadFailedError(queue_item.gdrive_file.name, str(download_error), inner_exception=download_error) from download_error
 
     return queue_item
 
 
-def file_already_downloaded(queue_item: CollectionFileQueueItem, filesystem: FileSystem = FileSystem()) -> bool:
+def file_already_downloaded(queue_item: QueueItem, filesystem: FileSystem = FileSystem()) -> bool:
     if importer_utils.check_if_exists(queue_item.target_file_path, queue_item.gdrive_file.size, filesystem):
-        log.file_exists(queue_item.item_no, queue_item.download_file_path)
+        log.file_exists(queue_item.item_no, queue_item.target_file_path)
         return True
 
     # File also counts as not existing, if the file size differs from the file on gdrive

@@ -5,7 +5,7 @@ import pytest
 
 from src.app.core.models.collection_file_change import CollectionFileChange
 from src.app.importer.database_worker import update_queue_item
-from src.app.models.queue_item import CollectionFileQueueItem
+from src.app.models.queue_item import QueueItem
 
 
 DOWNLOADED_AT = datetime(2024, 8, 1)
@@ -33,7 +33,7 @@ test_cases_updated = [
 @pytest.mark.usefixtures("patch_crud_save_collection")
 @pytest.mark.parametrize(["downloaded_at", "imported_at", "download_error"], test_cases_updated)
 async def test_queue_item_is_updated(
-    queue_item: CollectionFileQueueItem,
+    queue_item: QueueItem,
     downloaded_at: Optional[datetime],
     imported_at: Optional[datetime],
     download_error: Optional[bool],
