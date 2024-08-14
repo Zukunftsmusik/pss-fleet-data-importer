@@ -5,7 +5,7 @@ import time
 from concurrent.futures import CancelledError, Future, ThreadPoolExecutor
 from datetime import timedelta
 from pathlib import Path
-from typing import Any, Callable, Iterable, Optional, Union
+from typing import Any, Iterable, Optional, Protocol, Union
 
 import pydrive2.files
 
@@ -19,6 +19,11 @@ from ..log.log_importer import download_worker as log
 from ..models.queue_item import CollectionFileQueueItem
 from . import utils as importer_utils
 from .exceptions import DownloadFailedError
+
+
+class DownloadFunction(Protocol):
+    def __call__(fakeself, queue_item: CollectionFileQueueItem, *args, cancel_token: CancellationToken, **kwargs) -> CollectionFileQueueItem:
+        pass
 
 
 def worker(
@@ -119,7 +124,7 @@ def wait_for_download(
 def setup_futures(
     executor: ThreadPoolExecutor,
     queue_items: Iterable[CollectionFileQueueItem],
-    func: Callable[..., Optional[CollectionFileQueueItem]],
+    func: DownloadFunction,
     cancel_token: Optional[CancellationToken] = None,
     additional_func_args: Optional[Iterable[Any]] = None,
     **func_kwargs,
@@ -130,7 +135,7 @@ def setup_futures(
         if cancel_token and cancel_token.log_if_cancelled("Requested cancellation during thread pool setup."):
             break
 
-        futures.append(executor.submit(func, queue_item, *additional_func_args, **func_kwargs))
+        futures.append(executor.submit(func, queue_item, *additional_func_args, cancel_token=cancel_token, **func_kwargs))
 
     return futures
 
