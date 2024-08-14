@@ -9,48 +9,6 @@ from src.app.importer.download_worker import write_gdrive_file_to_disk
 from tests.fake_classes import FakeFileSystem
 
 
-def test_return_none_if_content_is_none(
-    filesystem: FileSystem,
-    cancel_token: CancellationToken,
-    google_drive_file_name: str,
-):
-    file_path = "/dev/bull/abc.def"
-    download_file_path, download_error = write_gdrive_file_to_disk(
-        None,
-        file_path,
-        cancel_token,
-        1,
-        google_drive_file_name,
-        1,
-        filesystem=filesystem,
-    )
-
-    assert download_file_path is None
-    assert download_error is True
-    assert filesystem.exists(file_path) is False
-
-
-def test_return_none_if_content_is_empty(
-    filesystem: FileSystem,
-    cancel_token: CancellationToken,
-    google_drive_file_name: str,
-):
-    file_path = "/dev/bull/abc.def"
-    download_file_path, download_error = write_gdrive_file_to_disk(
-        "",
-        file_path,
-        cancel_token,
-        1,
-        google_drive_file_name,
-        1,
-        filesystem=filesystem,
-    )
-
-    assert download_file_path is None
-    assert download_error is True
-    assert filesystem.exists(file_path) is False
-
-
 test_cases_attemps = [pytest.param(i, id=str(i)) for i in range(1, 6)]
 
 
@@ -88,7 +46,7 @@ def test_file_written(
 ):
     file_path = "/dev/bull/abc.def"
 
-    download_file_path, download_error = write_gdrive_file_to_disk(
+    write_gdrive_file_to_disk(
         google_drive_file_content,
         file_path,
         cancel_token,
@@ -98,8 +56,6 @@ def test_file_written(
         filesystem=filesystem,
     )
 
-    assert download_file_path == file_path
-    assert download_error is False
     assert filesystem.exists(file_path) is True
     assert filesystem.read(file_path) == google_drive_file_content
 

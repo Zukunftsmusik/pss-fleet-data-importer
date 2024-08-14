@@ -77,7 +77,7 @@ def configuration() -> config.Config:
 
 
 @pytest.fixture(scope="function")
-def mock_gdrive_client() -> FakeGoogleDriveClient:
+def fake_gdrive_client() -> FakeGoogleDriveClient:
     return FakeGoogleDriveClient()
 
 

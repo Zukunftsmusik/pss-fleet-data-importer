@@ -1,7 +1,7 @@
 import logging
 
-import pydrive2.files
 import pytest
+from importer_test_cases import test_cases_raised_error_caught
 
 from src.app.core.gdrive import GoogleDriveClient
 from src.app.core.models.cancellation_token import OperationCancelledError
@@ -13,31 +13,23 @@ from tests.fake_classes import FakeGDriveFile, FakeGoogleDriveClient
 @pytest.mark.usefixtures("patch_time_sleep")
 def test_returns_contents(
     fake_gdrive_file: FakeGDriveFile,
-    mock_gdrive_client: GoogleDriveClient,
+    fake_gdrive_client: GoogleDriveClient,
     cancel_token: CancellationToken,
     caplog: pytest.LogCaptureFixture,
 ):
     for max_download_attempts in range(1, 6):
         with caplog.at_level(logging.WARN):
-            contents = download_gdrive_file_contents(fake_gdrive_file, mock_gdrive_client, cancel_token, 1, max_download_attempts, False)
+            contents = download_gdrive_file_contents(fake_gdrive_file, fake_gdrive_client, cancel_token, 1, max_download_attempts, False)
         assert contents == fake_gdrive_file.content
         assert not caplog.text
         caplog.clear()
-
-
-test_cases_raised_error_caught = [
-    # exception_type
-    pytest.param(pydrive2.files.ApiRequestError, id="api_request_error"),
-    pytest.param(pydrive2.files.FileNotDownloadableError, id="file_not_downloadable_error"),
-]
-"""exception_type"""
 
 
 @pytest.mark.usefixtures("patch_time_sleep")
 @pytest.mark.parametrize(["exception_type"], test_cases_raised_error_caught)
 def test_raised_error_caught(
     fake_gdrive_file: FakeGDriveFile,
-    mock_gdrive_client: FakeGoogleDriveClient,
+    fake_gdrive_client: FakeGoogleDriveClient,
     cancel_token: CancellationToken,
     google_api_errors: dict[type[Exception], Exception],
     exception_type: type[Exception],
@@ -54,7 +46,7 @@ def test_raised_error_caught(
     for max_download_attempts in range(1, 6):
         with caplog.at_level(logging.WARN):
             with pytest.raises(exception_type):
-                _ = download_gdrive_file_contents(fake_gdrive_file, mock_gdrive_client, cancel_token, item_no, max_download_attempts, False)
+                _ = download_gdrive_file_contents(fake_gdrive_file, fake_gdrive_client, cancel_token, item_no, max_download_attempts, False)
         assert caplog.text
         assert str(item_no) in caplog.text
         caplog.clear()
@@ -75,7 +67,7 @@ test_cases_raised_error_not_caught = [
 @pytest.mark.parametrize(["exception_type"], test_cases_raised_error_not_caught)
 def test_raised_error_not_caught(
     fake_gdrive_file: FakeGDriveFile,
-    mock_gdrive_client: GoogleDriveClient,
+    fake_gdrive_client: GoogleDriveClient,
     cancel_token: CancellationToken,
     exception_type: type[Exception],
     caplog: pytest.LogCaptureFixture,
@@ -91,7 +83,7 @@ def test_raised_error_not_caught(
     for max_download_attempts in range(1, 6):
         with caplog.at_level(logging.WARN):
             with pytest.raises(exception_type):
-                _ = download_gdrive_file_contents(fake_gdrive_file, mock_gdrive_client, cancel_token, item_no, max_download_attempts, False)
+                _ = download_gdrive_file_contents(fake_gdrive_file, fake_gdrive_client, cancel_token, item_no, max_download_attempts, False)
         assert not caplog.text
         caplog.clear()
 
@@ -99,7 +91,7 @@ def test_raised_error_not_caught(
 @pytest.mark.usefixtures("patch_time_sleep")
 def test_cancelled(
     fake_gdrive_file: FakeGDriveFile,
-    mock_gdrive_client: FakeGoogleDriveClient,
+    fake_gdrive_client: FakeGoogleDriveClient,
     cancel_token: CancellationToken,
     caplog: pytest.LogCaptureFixture,
 ):
@@ -109,6 +101,6 @@ def test_cancelled(
     for max_download_attempts in range(1, 6):
         with caplog.at_level(logging.WARN):
             with pytest.raises(OperationCancelledError):
-                _ = download_gdrive_file_contents(fake_gdrive_file, mock_gdrive_client, cancel_token, item_no, max_download_attempts, False)
+                _ = download_gdrive_file_contents(fake_gdrive_file, fake_gdrive_client, cancel_token, item_no, max_download_attempts, False)
         assert not caplog.text
         caplog.clear()

@@ -36,7 +36,7 @@ test_cases_log_exception = [
 
 @pytest.mark.parametrize(["exception_type"], test_cases_do_not_log_exception)
 def test_do_not_log_exception(
-    mock_gdrive_client: FakeGoogleDriveClient,
+    fake_gdrive_client: FakeGoogleDriveClient,
     fake_gdrive_file: FakeGDriveFile,
     exception_type: type[Exception],
     monkeypatch: pytest.MonkeyPatch,
@@ -49,14 +49,14 @@ def test_do_not_log_exception(
 
     with caplog.at_level(logging.WARNING):
         with pytest.raises(exception_type):
-            _ = mock_gdrive_client.get_file_contents(fake_gdrive_file)
+            _ = fake_gdrive_client.get_file_contents(fake_gdrive_file)
 
     assert "An error occured while downloading file" not in caplog.text
 
 
 @pytest.mark.parametrize(["exception_type", "exception_instance"], test_cases_log_exception)
 def test_log_exception(
-    mock_gdrive_client: FakeGoogleDriveClient,
+    fake_gdrive_client: FakeGoogleDriveClient,
     fake_gdrive_file: FakeGDriveFile,
     exception_type: type[Exception],
     exception_instance: Exception,
@@ -70,15 +70,15 @@ def test_log_exception(
 
     with caplog.at_level(logging.WARNING):
         with pytest.raises(exception_type):
-            _ = mock_gdrive_client.get_file_contents(fake_gdrive_file)
+            _ = fake_gdrive_client.get_file_contents(fake_gdrive_file)
 
     assert fake_gdrive_file.name in caplog.text
     assert "An error occured while downloading file" in caplog.text
 
 
 def test_returns_contents(
-    mock_gdrive_client: FakeGoogleDriveClient,
+    fake_gdrive_client: FakeGoogleDriveClient,
     fake_gdrive_file: FakeGDriveFile,
 ):
-    result = mock_gdrive_client.get_file_contents(fake_gdrive_file)
+    result = fake_gdrive_client.get_file_contents(fake_gdrive_file)
     assert result == fake_gdrive_file.content

@@ -46,7 +46,7 @@ def worker(
 
     log.thread_pool_setup(thread_pool_size)
     executor = ThreadPoolExecutor(thread_pool_size, thread_name_prefix="Download gdrive file")
-    futures: list[Future] = setup_futures(
+    futures = setup_futures(
         executor,
         queue_items,
         download_gdrive_file,
@@ -74,7 +74,7 @@ def worker(
 
 
 def wait_for_futures(
-    futures: Iterable[Future],
+    futures: Iterable[tuple[Future, QueueItem]],
     executor: ThreadPoolExecutor,
     database_queue: queue.Queue,
     import_queue: queue.Queue,
@@ -82,14 +82,14 @@ def wait_for_futures(
     cancel_token: CancellationToken,
     timeout: float = 60.0,
 ):
-    for future_no, future in enumerate(futures, 1):
+    for future, queue_item in futures:
         if cancel_token.cancelled:
             if not future.done():
                 future.cancel()
             continue
 
-        queue_item = wait_for_download(future, future_no, executor, worker_timed_out_flag, timeout)
-        if queue_item:
+        wait_for_download(future, queue_item.item_no, executor, worker_timed_out_flag, timeout)
+        if queue_item.downloaded:
             database_queue.put(
                 (
                     queue_item,
@@ -105,20 +105,29 @@ def wait_for_download(
     executor: ThreadPoolExecutor,
     worker_timed_out_flag: StatusFlag,
     timeout: float = 60,
-) -> Optional[QueueItem]:
+) -> QueueItem:
     try:
-        return future.result(timeout)
+        queue_item: QueueItem = future.result(timeout)
+        queue_item.downloaded = True
+        queue_item.error_while_downloading = False
     except (CancelledError, OperationCancelledError):
-        pass
+        queue_item.downloaded = False
+        queue_item.error_while_downloading = False
     except TimeoutError:
+        queue_item.downloaded = False
+        queue_item.error_while_downloading = True
         worker_timed_out_flag.value = True
+
         executor.shutdown(False, cancel_futures=True)
 
         log.future_timeout(future_no)
     except Exception as exc:
+        queue_item.downloaded = False
+        queue_item.error_while_downloading = True
+
         log.future_error(future_no, exc)
 
-    return None
+    return queue_item
 
 
 def setup_futures(
@@ -128,14 +137,19 @@ def setup_futures(
     cancel_token: Optional[CancellationToken] = None,
     additional_func_args: Optional[Iterable[Any]] = None,
     **func_kwargs,
-) -> list[Future]:
+) -> list[tuple[Future, QueueItem]]:
     futures = []
     additional_func_args = additional_func_args or ()
     for queue_item in queue_items:
         if cancel_token and cancel_token.log_if_cancelled("Requested cancellation during thread pool setup."):
             break
 
-        futures.append(executor.submit(func, queue_item, *additional_func_args, cancel_token=cancel_token, **func_kwargs))
+        futures.append(
+            (
+                executor.submit(func, queue_item, *additional_func_args, cancel_token=cancel_token, **func_kwargs),
+                queue_item,
+            )
+        )
 
     return futures
 
@@ -146,12 +160,10 @@ def download_gdrive_file(
     log_stack_trace_on_download_error: bool,
     max_download_attempts: int = 3,
     filesystem: FileSystem = FileSystem(),
-) -> Optional[QueueItem]:
-    already_downloaded = file_already_downloaded(queue_item, filesystem=filesystem)
-
-    if already_downloaded:
-        queue_item.downloaded = True
-        return queue_item
+):
+    if file_already_downloaded(queue_item, filesystem=filesystem):
+        log.file_exists(queue_item.item_no, queue_item.target_file_path)
+        return
 
     try:
         file_contents = download_gdrive_file_contents(
@@ -163,12 +175,13 @@ def download_gdrive_file(
             log_stack_trace_on_download_error,
         )
     except (pydrive2.files.ApiRequestError, pydrive2.files.FileNotDownloadableError) as download_error:
-        queue_item.downloaded = False
-        queue_item.error_while_downloading = True
         raise DownloadFailedError(queue_item.gdrive_file.name, str(download_error), inner_exception=download_error) from download_error
 
+    if not file_contents:
+        raise DownloadFailedError(queue_item.gdrive_file.name, "The downloaded file was empty.")
+
     try:
-        queue_item.downloaded, queue_item.error_while_downloading = write_gdrive_file_to_disk(
+        write_gdrive_file_to_disk(
             file_contents,
             queue_item.target_file_path,
             queue_item.cancel_token,
@@ -176,12 +189,10 @@ def download_gdrive_file(
             queue_item.gdrive_file.name,
             max_download_attempts,
         )
-    except IOError as download_error:
-        queue_item.downloaded = False
-        queue_item.error_while_downloading = True
-        raise DownloadFailedError(queue_item.gdrive_file.name, str(download_error), inner_exception=download_error) from download_error
+    except IOError as io_error:
+        raise DownloadFailedError(queue_item.gdrive_file.name, str(io_error), inner_exception=io_error) from io_error
 
-    return queue_item
+    log.downloaded_file(queue_item.item_no, queue_item.target_file_path)
 
 
 def file_already_downloaded(queue_item: QueueItem, filesystem: FileSystem = FileSystem()) -> bool:
@@ -202,13 +213,13 @@ def download_gdrive_file_contents(
     item_no: int,
     max_download_attempts: int,
     log_stack_trace: bool,
-):
+) -> str:
     download_error: Union[pydrive2.files.ApiRequestError, pydrive2.files.FileNotDownloadableError] = None
 
     for attempt in range(max_download_attempts):
         cancel_token.raise_if_cancelled("Cancelled download of file no. %i: %s", item_no, gdrive_file.name, log_level=logging.DEBUG)
 
-        log.download_gdrive_file(attempt, item_no, gdrive_file.name)
+        log.downloading_gdrive_file(attempt, item_no, gdrive_file.name)
 
         try:
             file_contents = gdrive_client.get_file_contents(gdrive_file)
@@ -235,21 +246,17 @@ def write_gdrive_file_to_disk(
     gdrive_file_name: str,
     max_write_attempts: int,
     filesystem: FileSystem = FileSystem(),
-) -> tuple[Path, bool]:
-    if file_contents:
-        download_error: IOError = None
+):
+    io_error: IOError = None
 
-        for _ in range(max_write_attempts):
-            cancel_token.raise_if_cancelled("Cancelled download of file no. %i: %s", item_no, gdrive_file_name, log_level=logging.DEBUG)
+    for _ in range(max_write_attempts):
+        cancel_token.raise_if_cancelled("Cancelled download of file no. %i: %s", item_no, gdrive_file_name, log_level=logging.DEBUG)
 
-            try:
-                filesystem.write(file_path, file_contents)
-            except IOError as exc:
-                download_error = exc
-                continue
+        try:
+            filesystem.write(file_path, file_contents)
+            return
+        except IOError as exc:
+            io_error = exc
+            continue
 
-            return file_path, False
-
-        raise download_error
-
-    return None, True
+    raise io_error

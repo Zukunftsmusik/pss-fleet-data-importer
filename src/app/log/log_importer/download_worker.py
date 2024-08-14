@@ -22,7 +22,11 @@ def download_error(item_no: int, gdrive_file_name: str, log_stack_trace: bool, e
         LOGGER.error("%s:  %s", msg, type(exc))
 
 
-def download_gdrive_file(attempt: int, item_no: int, gdrive_file_name: str):
+def downloaded_file(item_no: int, file_path: Union[Path, str]):
+    LOGGER.debug("File no. %i downloaded: %s", item_no, file_path)
+
+
+def downloading_gdrive_file(attempt: int, item_no: int, gdrive_file_name: str):
     if attempt > 0:
         LOGGER.warn("Attempt %i at downloading file no. %i: %s", attempt + 1, item_no, gdrive_file_name)
     else:
@@ -72,7 +76,7 @@ def write_file_to_disk(item_no: int, file_path: Union[Path, str]):
 __all__ = [
     download_completed.__name__,
     download_error.__name__,
-    download_gdrive_file.__name__,
+    downloading_gdrive_file.__name__,
     download_worker_ended.__name__,
     download_worker_started.__name__,
     file_delete.__name__,
