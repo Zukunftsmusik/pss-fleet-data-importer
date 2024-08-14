@@ -5,7 +5,7 @@ import time
 from concurrent.futures import CancelledError, Future, ThreadPoolExecutor
 from datetime import timedelta
 from pathlib import Path
-from typing import Iterable, Optional, Union
+from typing import Any, Callable, Iterable, Optional, Union
 
 import pydrive2.files
 
@@ -32,6 +32,7 @@ def worker(
     worker_timed_out_flag: StatusFlag,
     cancel_token: CancellationToken,
     debug_mode: bool,
+    filesystem: FileSystem = FileSystem(),
 ):
     status_flag.value = True
     worker_timed_out_flag.value = False
@@ -40,7 +41,15 @@ def worker(
 
     log.thread_pool_setup(thread_pool_size)
     executor = ThreadPoolExecutor(thread_pool_size, thread_name_prefix="Download gdrive file")
-    futures: list[Future] = setup_futures(executor, queue_items, gdrive_client, debug_mode, cancel_token=cancel_token)
+    futures: list[Future] = setup_futures(
+        executor,
+        queue_items,
+        download_gdrive_file,
+        cancel_token=cancel_token,
+        additional_func_args=(gdrive_client, debug_mode),
+        max_download_attempts=3,
+        filesystem=filesystem,
+    )
 
     log.wait_for_futures()
     wait_for_futures(futures, executor, database_queue, import_queue, worker_timed_out_flag, cancel_token, worker_timeout)
@@ -110,16 +119,18 @@ def wait_for_download(
 def setup_futures(
     executor: ThreadPoolExecutor,
     queue_items: Iterable[CollectionFileQueueItem],
-    gdrive_client: GoogleDriveClient,
-    debug_mode: bool,
-    cancel_token: CancellationToken = None,
+    func: Callable[..., Optional[CollectionFileQueueItem]],
+    cancel_token: Optional[CancellationToken] = None,
+    additional_func_args: Optional[Iterable[Any]] = None,
+    **func_kwargs,
 ) -> list[Future]:
     futures = []
+    additional_func_args = additional_func_args or ()
     for queue_item in queue_items:
         if cancel_token and cancel_token.log_if_cancelled("Requested cancellation during thread pool setup."):
             break
 
-        futures.append(executor.submit(download_gdrive_file, queue_item, gdrive_client, debug_mode, max_download_attempts=3))
+        futures.append(executor.submit(func, queue_item, *additional_func_args, **func_kwargs))
 
     return futures
 

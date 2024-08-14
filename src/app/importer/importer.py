@@ -91,11 +91,12 @@ class Importer:
         queue_items = FromCollectionFileDB.to_queue_items(gdrive_files, collection_files, self.config.temp_download_folder, self.status.cancel_token)
 
         log.download_folder_create(self.config.temp_download_folder)
-        FileSystem().mkdir(self.config.temp_download_folder, create_parents=True, exist_ok=True)
+        filesystem = FileSystem()
+        filesystem.mkdir(self.config.temp_download_folder, create_parents=True, exist_ok=True)
 
         log.downloads_imports_count(queue_items)
 
-        worker_threads = self.create_worker_threads(queue_items)
+        worker_threads = self.create_worker_threads(queue_items, filesystem=filesystem)
 
         for thread in worker_threads:
             thread.start()
@@ -109,7 +110,7 @@ class Importer:
 
         return True
 
-    def create_worker_threads(self, queue_items: Iterable[CollectionFileQueueItem]) -> list[threading.Thread]:
+    def create_worker_threads(self, queue_items: Iterable[CollectionFileQueueItem], filesystem: FileSystem = FileSystem()) -> list[threading.Thread]:
         worker_threads = [
             threading.Thread(
                 target=download_worker.worker,
@@ -125,6 +126,7 @@ class Importer:
                     self.status.download_worker_timed_out,
                     self.status.cancel_token,
                     self.config.debug_mode,
+                    filesystem,
                 ],
                 daemon=True,
             ),
@@ -139,6 +141,7 @@ class Importer:
                     self.status.cancel_token,
                     1,
                     self.config.keep_downloaded_files,
+                    filesystem,
                 ),
                 daemon=True,
             ),
