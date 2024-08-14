@@ -22,7 +22,7 @@ from .exceptions import DownloadFailedError
 
 
 class DownloadFunction(Protocol):
-    def __call__(fakeself, queue_item: CollectionFileQueueItem, *args, cancel_token: CancellationToken, **kwargs) -> CollectionFileQueueItem:
+    def __call__(self, queue_item: CollectionFileQueueItem, *args, cancel_token: CancellationToken, **kwargs) -> CollectionFileQueueItem:
         pass
 
 
