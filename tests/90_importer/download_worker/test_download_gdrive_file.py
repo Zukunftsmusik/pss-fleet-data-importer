@@ -4,7 +4,6 @@ from typing import Optional
 import pytest
 from importer_test_cases import test_cases_raised_error_caught
 
-from fake_classes import FakeGoogleDriveClient
 from src.app.core.models.filesystem import FileSystem
 from src.app.importer import download_worker
 from src.app.importer.download_worker import download_gdrive_file
