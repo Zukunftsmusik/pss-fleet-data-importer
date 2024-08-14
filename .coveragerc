@@ -14,6 +14,8 @@ exclude_also =
     if __name__ == .__main__.:
     ; Don't complain about abstract methods, they aren't run:
     @(abc\\.)?abstractmethod
+    ; Don't complain about pass
+    ^ *?pass *$
 
 [xml]
 output = cov.xml
