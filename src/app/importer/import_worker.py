@@ -38,7 +38,7 @@ async def worker(
             none_count += 1
             continue
 
-        if await skip_file_import_on_error(queue_item.item_no, queue_item):
+        if skip_file_import_on_error(queue_item, filesystem=filesystem):
             log.skip_file_error(queue_item.item_no, queue_item.gdrive_file.name)
             import_queue.task_done()
             continue
@@ -46,7 +46,7 @@ async def worker(
         log.import_start(queue_item.item_no, queue_item.target_file_path)
 
         try:
-            imported_at = await import_file(fleet_data_client, queue_item)
+            imported_at = await import_file(fleet_data_client, queue_item, filesystem=filesystem)
         except ApiError as exc:
             log.file_import_api_error(queue_item.item_no, queue_item.gdrive_file.name, exc)
             continue
@@ -64,7 +64,7 @@ async def worker(
     status_flag.value = False
 
 
-async def import_file(fleet_data_client: PssFleetDataClient, queue_item: QueueItem) -> datetime:
+async def import_file(fleet_data_client: PssFleetDataClient, queue_item: QueueItem, filesystem: FileSystem = FileSystem()) -> datetime:
     try:
         collection_metadata = await fleet_data_client.upload_collection(queue_item.target_file_path)
         imported_at = utils.remove_timezone(datetime.now(tz=timezone.utc))
@@ -77,17 +77,17 @@ async def import_file(fleet_data_client: PssFleetDataClient, queue_item: QueueIt
     return imported_at
 
 
-async def skip_file_import_on_error(file_no: int, queue_item: QueueItem, filesystem: FileSystem = FileSystem()) -> bool:
+def skip_file_import_on_error(queue_item: QueueItem, filesystem: FileSystem = FileSystem()) -> bool:
     if queue_item.cancel_token.cancelled:
         return True
 
     if queue_item.error_while_downloading:
-        log.skip_file_import_download_error(file_no, queue_item.gdrive_file.name)
+        log.skip_file_import_download_error(queue_item.item_no, queue_item.gdrive_file.name)
         return True
 
     contents = filesystem.load_json(queue_item.target_file_path)
     if not contents:
-        log.skip_file_import_empty_json(file_no, queue_item.target_file_path)
+        log.skip_file_import_empty_json(queue_item.item_no, queue_item.target_file_path)
         return True
 
     return False

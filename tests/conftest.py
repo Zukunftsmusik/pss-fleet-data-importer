@@ -170,8 +170,8 @@ def collection_file_db(
 
 
 @pytest.fixture(scope="function")
-def queue_item(gdrive_file: GDriveFile, collection_file_db: CollectionFileDB) -> QueueItem:
-    return QueueItem(1, gdrive_file, collection_file_db, "/dev/null", None)
+def queue_item(gdrive_file: GDriveFile, collection_file_db: CollectionFileDB, cancel_token: CancellationToken) -> QueueItem:
+    return QueueItem(1, gdrive_file, collection_file_db, "/dev/null", cancel_token)
 
 
 @pytest.fixture(scope="function")
