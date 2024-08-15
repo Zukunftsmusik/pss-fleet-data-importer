@@ -57,7 +57,8 @@ def worker(
     )
 
     log.wait_for_futures()
-    wait_for_futures(futures, executor, database_queue, import_queue, worker_timed_out_flag, cancel_token, worker_timeout)
+    for future, queue_item in futures:
+        wait_for_future(future, queue_item, executor, database_queue, import_queue, worker_timed_out_flag, cancel_token, worker_timeout)
 
     if cancel_token.cancelled:
         log.thread_pool_cancel()
@@ -73,8 +74,9 @@ def worker(
     status_flag.value = False
 
 
-def wait_for_futures(
-    futures: Iterable[tuple[Future, QueueItem]],
+def wait_for_future(
+    future: Future,
+    queue_item: QueueItem,
     executor: ThreadPoolExecutor,
     database_queue: queue.Queue,
     import_queue: queue.Queue,
@@ -82,21 +84,15 @@ def wait_for_futures(
     cancel_token: CancellationToken,
     timeout: float = 60.0,
 ):
-    for future, queue_item in futures:
-        if cancel_token.cancelled:
-            if not future.done():
-                future.cancel()
-            continue
+    if cancel_token.cancelled:
+        if not future.done():
+            future.cancel()
+        return
 
-        wait_for_download(future, queue_item, queue_item.item_no, executor, worker_timed_out_flag, timeout)
-        if queue_item.downloaded:
-            database_queue.put(
-                (
-                    queue_item,
-                    CollectionFileChange(downloaded_at=utils.get_now(), download_error=queue_item.error_while_downloading),
-                )
-            )
-            import_queue.put(queue_item)
+    wait_for_download(future, queue_item, executor, worker_timed_out_flag, timeout)
+    if queue_item.downloaded:
+        database_queue.put((queue_item, CollectionFileChange(downloaded_at=utils.get_now(), download_error=queue_item.error_while_downloading)))
+        import_queue.put(queue_item)
 
 
 def wait_for_download(
