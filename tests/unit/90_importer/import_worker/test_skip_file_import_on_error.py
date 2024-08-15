@@ -34,7 +34,7 @@ def test_return_true_if_file_contains_empty_json(obj: object, queue_item: QueueI
     assert skip_file_import_on_error(queue_item, filesystem=filesystem) is True
 
 
-def test_return_false_else(queue_item: QueueItem, filesystem: FakeFileSystem, collection_metadata_out: CollectionMetadata):
-    filesystem.dump_json(queue_item.target_file_path, collection_metadata_out.model_dump_json())
+def test_return_false_else(queue_item: QueueItem, filesystem: FakeFileSystem, mock_collection_metadata: CollectionMetadata):
+    filesystem.dump_json(queue_item.target_file_path, mock_collection_metadata.model_dump_json())
 
     assert skip_file_import_on_error(queue_item, filesystem=filesystem) is False
