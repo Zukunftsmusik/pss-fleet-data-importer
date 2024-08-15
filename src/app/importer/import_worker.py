@@ -57,19 +57,28 @@ async def process_queue_item(
         log.skip_file_error(queue_item.item_no, queue_item.gdrive_file.name)
     else:
         log.import_start(queue_item.item_no, queue_item.target_file_path)
-
-        try:
-            imported_at = await import_file(fleet_data_client, queue_item)
-        except ApiError as exc:
-            log.file_import_api_error(queue_item.item_no, queue_item.gdrive_file.name, exc)
-        else:
-            database_queue.put((queue_item, CollectionFileChange(imported_at=imported_at)))
-
-            if not keep_downloaded_files:
-                filesystem.delete(queue_item.target_file_path, missing_ok=True)
+        await do_import(fleet_data_client, queue_item, database_queue, keep_downloaded_files, filesystem=filesystem)
 
     import_queue.task_done()
     return none_count
+
+
+async def do_import(
+    fleet_data_client: PssFleetDataClient,
+    queue_item: QueueItem,
+    database_queue: queue.Queue,
+    keep_downloaded_files: bool,
+    filesystem: FileSystem = FileSystem(),
+):
+    try:
+        imported_at = await import_file(fleet_data_client, queue_item)
+    except ApiError as exc:
+        log.file_import_api_error(queue_item.item_no, queue_item.gdrive_file.name, exc)
+    else:
+        database_queue.put((queue_item, CollectionFileChange(imported_at=imported_at)))
+
+        if not keep_downloaded_files:
+            filesystem.delete(queue_item.target_file_path, missing_ok=True)
 
 
 async def import_file(fleet_data_client: PssFleetDataClient, queue_item: QueueItem) -> datetime:
