@@ -31,6 +31,10 @@ def import_worker_ended(cancel_token: CancellationToken):
     worker_ended(WORKER_NAME, cancel_token)
 
 
+def import_worker_error(exc: Exception):
+    LOGGER.critical(exc, exc_info=True)
+
+
 def import_worker_started():
     worker_started(WORKER_NAME)
 

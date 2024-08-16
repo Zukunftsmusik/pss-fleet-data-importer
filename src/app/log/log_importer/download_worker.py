@@ -10,8 +10,8 @@ LOGGER = LOGGER_IMPORTER.getChild("downloadWorker")
 WORKER_NAME = "Download"
 
 
-def download_completed(item_no: int, gdrive_file_name: str):
-    LOGGER.debug("File no. %i downloaded: %s", item_no, gdrive_file_name)
+def file_contents_downloaded(item_no: int, gdrive_file_name: str):
+    LOGGER.debug("Contents of file no. %i downloaded: %s", item_no, gdrive_file_name)
 
 
 def download_error(item_no: int, gdrive_file_name: str, log_stack_trace: bool, exc: Exception, sleep_for: int):
@@ -23,7 +23,7 @@ def download_error(item_no: int, gdrive_file_name: str, log_stack_trace: bool, e
 
 
 def downloaded_file(item_no: int, file_path: Union[Path, str]):
-    LOGGER.debug("File no. %i downloaded: %s", item_no, file_path)
+    LOGGER.info("File no. %i downloaded: %s", item_no, file_path)
 
 
 def downloading_gdrive_file(attempt: int, item_no: int, gdrive_file_name: str):
@@ -74,7 +74,7 @@ def write_file_to_disk(item_no: int, file_path: Union[Path, str]):
 
 
 __all__ = [
-    download_completed.__name__,
+    file_contents_downloaded.__name__,
     download_error.__name__,
     downloading_gdrive_file.__name__,
     download_worker_ended.__name__,

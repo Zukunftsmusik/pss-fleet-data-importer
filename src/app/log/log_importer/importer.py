@@ -11,7 +11,9 @@ from .. import LOGGER_BASE
 LOGGER = LOGGER_BASE.getChild("Importer")
 
 
-def bulk_import_finish(queue_items: list[QueueItem], modified_after: Optional[datetime], modified_before: Optional[datetime]):
+def bulk_import_finish(
+    queue_items: list[QueueItem], modified_after: Optional[datetime], modified_before: Optional[datetime], start: datetime, end: datetime
+):
     total_item_count = len(queue_items)
     downloaded_item_count = len([queue_item for queue_item in queue_items if queue_item.collection_file.downloaded_at])
     imported_item_count = len([queue_item for queue_item in queue_items if queue_item.collection_file.imported_at])
@@ -30,6 +32,11 @@ def bulk_import_finish(queue_items: list[QueueItem], modified_after: Optional[da
             LOGGER.info("%s.", base_message)
 
 
+def bulk_import_finish_time(item_count: int, start: datetime, end: datetime):
+    LOGGER.info("### Finished bulk import of %i files at: %s (after: %s)", item_count, end.isoformat(), str(end - start))
+    print(f"### Finished bulk import of {item_count} files at: {end.isoformat()} (after: {end - start})")
+
+
 def bulk_import_start(modified_after: Optional[datetime], modified_before: Optional[datetime]):
     if modified_after:
         if modified_before:
@@ -43,6 +50,11 @@ def bulk_import_start(modified_after: Optional[datetime], modified_before: Optio
             LOGGER.info("Starting bulk import of files modified before %s.", modified_before.isoformat())
         else:
             LOGGER.info("Starting bulk import.")
+
+
+def bulk_import_start_time(start: datetime):
+    LOGGER.info("### Starting bulk import at: %s", start.isoformat())
+    print(f"### Starting bulk import at: {start.isoformat()}")
 
 
 def database_entries_create():
