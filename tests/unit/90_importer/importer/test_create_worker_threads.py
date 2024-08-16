@@ -4,7 +4,7 @@ from src.app.importer.importer import Importer
 
 
 def test(importer: Importer):
-    threads = importer.create_worker_threads([])
+    threads = importer.create_download_worker_thread([])
     assert threads
     assert isinstance(threads, list)
     assert len(threads) == 3

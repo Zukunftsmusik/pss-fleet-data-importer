@@ -67,10 +67,6 @@ def worker(
         executor.shutdown()
 
     log.download_worker_ended(cancel_token)
-
-    database_queue.put((None, None))
-    import_queue.put(None)
-
     status_flag.value = False
 
 
@@ -143,7 +139,7 @@ def setup_futures(
 
         futures.append(
             (
-                executor.submit(func, queue_item, *additional_func_args, cancel_token=cancel_token, **func_kwargs),
+                executor.submit(func, queue_item, *additional_func_args, **func_kwargs),
                 queue_item,
             )
         )
@@ -228,7 +224,7 @@ def download_gdrive_file_contents(
             continue
 
         cancel_token.raise_if_cancelled("Cancelled download of file no. %i: %s", item_no, gdrive_file.name, log_level=logging.DEBUG)
-        log.download_completed(item_no, gdrive_file.name)
+        log.file_contents_downloaded(item_no, gdrive_file.name)
 
         return file_contents
 

@@ -17,19 +17,14 @@ async def worker(
     fleet_data_client: PssFleetDataClient,
     status_flag: StatusFlag,
     cancel_token: CancellationToken,
-    exit_after_none_count: int,
     keep_downloaded_files: bool = False,
     filesystem: FileSystem = FileSystem(),
 ):
     status_flag.value = True
     log.import_worker_started()
 
-    none_count = 0
-
-    while not cancel_token.cancelled and not none_count >= exit_after_none_count:
-        none_count = await process_queue_item(
-            fleet_data_client, import_queue, database_queue, none_count, keep_downloaded_files, filesystem=filesystem
-        )
+    while not cancel_token.cancelled:
+        await process_queue_item(fleet_data_client, import_queue, database_queue, keep_downloaded_files, filesystem=filesystem)
 
     log.import_worker_ended(cancel_token)
     database_queue.put((None, None))
@@ -41,7 +36,6 @@ async def process_queue_item(
     fleet_data_client: PssFleetDataClient,
     import_queue: queue.Queue,
     database_queue: queue.Queue,
-    none_count: int,
     keep_downloaded_files: bool,
     filesystem: FileSystem = FileSystem(),
 ) -> int:
@@ -49,18 +43,16 @@ async def process_queue_item(
         queue_item: QueueItem = import_queue.get(block=False)
     except queue.Empty:
         await asyncio.sleep(0.1)
-        return none_count
+        return
 
-    if queue_item is None:
-        none_count += 1
-    elif skip_file_import_on_error(queue_item, filesystem=filesystem):
+    if skip_file_import_on_error(queue_item, filesystem=filesystem):
         log.skip_file_error(queue_item.item_no, queue_item.gdrive_file.name)
     else:
         log.import_start(queue_item.item_no, queue_item.target_file_path)
         await do_import(fleet_data_client, queue_item, database_queue, keep_downloaded_files, filesystem=filesystem)
 
     import_queue.task_done()
-    return none_count
+    return
 
 
 async def do_import(
