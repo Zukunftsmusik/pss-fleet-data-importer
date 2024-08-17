@@ -31,7 +31,7 @@ def upgrade() -> None:
         sa.Column("timestamp", sa.DateTime(), nullable=False),
         sa.Column("downloaded_at", sa.DateTime(), nullable=True),
         sa.Column("imported_at", sa.DateTime(), nullable=True),
-        sa.Column("download_error", sa.Boolean(), nullable=True),
+        sa.Column("error", sa.Boolean(), nullable=True),
         sa.PrimaryKeyConstraint("id"),
     )
     op.create_index(op.f("ix_collection_file_file_name"), "collection_file", ["file_name"], unique=True)

@@ -30,7 +30,7 @@ test_cases_str = [
 
 @pytest.mark.parametrize(["downloaded_at", "imported_at", "download_error"], test_cases_str)
 def test_downloaded_at_in_str(downloaded_at: Optional[datetime], imported_at: Optional[datetime], download_error: Optional[bool]):
-    string = str(CollectionFileChange(downloaded_at=downloaded_at, imported_at=imported_at, download_error=download_error))
+    string = str(CollectionFileChange(downloaded_at=downloaded_at, imported_at=imported_at, error=download_error))
 
     if downloaded_at:
         assert f"downloaded_at={downloaded_at.isoformat()}" in string

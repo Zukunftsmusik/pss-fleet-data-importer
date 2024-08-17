@@ -1,23 +1,46 @@
+from datetime import datetime
 from pathlib import Path
 from threading import Lock
-from typing import Union
+from typing import Optional, Union
 
 from ..core.gdrive import GDriveFile
 from ..core.models.cancellation_token import CancellationToken
-from ..core.models.collection_file_change import CollectionFileChange
 from ..core.models.status import StatusFlag
-from ..database import crud
-from ..database.db_repository import DatabaseRepository
 from ..database.models import CollectionFileDB
 
 
 class QueueItemStatus:
-    downloading = StatusFlag("downloading", False)
     downloaded = StatusFlag("downloaded", False)
     download_error = StatusFlag("download_error", False)
-    importing = StatusFlag("importing", False)
+    download_timed_out = StatusFlag("download_timed_out", False)
     imported = StatusFlag("imported", False)
     import_error = StatusFlag("import_error", False)
+
+    def __init__(self):
+        self.__downloaded_at: datetime = None
+        self.__downloaded_at_lock = Lock()
+        self.__imported_at: datetime = None
+        self.__imported_at_lock = Lock()
+
+    @property
+    def downloaded_at(self) -> Optional[datetime]:
+        with self.__downloaded_at_lock:
+            return self.__downloaded_at
+
+    @downloaded_at.setter
+    def downloaded_at(self, value: datetime):
+        with self.__downloaded_at_lock:
+            self.__downloaded_at = value
+
+    @property
+    def imported_at(self) -> Optional[datetime]:
+        with self.__imported_at_lock:
+            return self.__imported_at
+
+    @downloaded_at.setter
+    def imported_at(self, value: datetime):
+        with self.__imported_at_lock:
+            self.__imported_at = value
 
 
 class QueueItem:

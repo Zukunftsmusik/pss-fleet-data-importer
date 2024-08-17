@@ -11,12 +11,14 @@ from ..converters import FromCollectionFileDB, FromGdriveFile
 from ..core import utils
 from ..core.config import Config
 from ..core.gdrive import GDriveFile, GoogleDriveClient
+from ..core.models.cancellation_token import CancellationToken
+from ..core.models.collection_file_change import CollectionFileChange
 from ..core.models.filesystem import FileSystem
 from ..database import DatabaseRepository, crud
 from ..database.models import CollectionFileDB
 from ..log.log_importer import importer as log
 from ..models import ImportStatus, QueueItem
-from . import database_worker, download_worker, import_worker
+from . import download_worker, import_worker
 
 
 class Importer:
@@ -35,32 +37,6 @@ class Importer:
         self.status = ImportStatus()
 
         self.import_queue: queue.Queue = queue.Queue()
-        self.database_queue: queue.Queue = queue.Queue()
-
-        self.__database_worker_thread: threading.Thread = utils.create_async_thread(
-            database_worker.worker,
-            name="Database worker",
-            args=(
-                self.database_queue,
-                self.status.bulk_database_running,
-                self.status.cancel_token,
-            ),
-            daemon=True,
-        )
-        self.__import_worker_thread: threading.Thread = utils.create_async_thread(
-            import_worker.worker,
-            name="Import worker",
-            args=(
-                self.import_queue,
-                self.database_queue,
-                self.fleet_data_client,
-                self.status.bulk_import_running,
-                self.status.cancel_token,
-                self.config.keep_downloaded_files,
-                filesystem,
-            ),
-            daemon=True,
-        )
 
     def cancel_workers(self):
         log.workers_cancel()
@@ -75,39 +51,27 @@ class Importer:
 
     async def run_import_loop(self, run_once: bool = False, modified_after: Optional[datetime] = None, modified_before: Optional[datetime] = None):
         cancel_message = "Import cancelled. Exiting import loop."
+
+        import_modified_after = await get_updated_modified_after(modified_after=modified_after)
+
         while True:
             if self.status.cancel_token.log_if_cancelled(cancel_message):
                 break
 
-            after = modified_after
-            async with DatabaseRepository.get_session() as session:
-                latest_imported_modified_date = await crud.get_latest_imported_gdrive_modified_date(session)
-
-            if latest_imported_modified_date:
-                latest_imported_modified_date = utils.get_next_full_hour(latest_imported_modified_date)
-
-                if modified_after:
-                    after = max(modified_after, latest_imported_modified_date)
-                else:
-                    after = latest_imported_modified_date
-
-            if self.status.cancel_token.log_if_cancelled(cancel_message):
-                break
-
-            if modified_before and after >= modified_before:
-                after = modified_before
+            if import_modified_after and modified_before and import_modified_after >= modified_before:
+                import_modified_after = modified_before
                 modified_before = None
                 # break
 
-            if utils.get_next_full_hour(after) > utils.get_now():
-                await wait_for_import()
+            if import_modified_after and utils.get_next_full_hour(import_modified_after) > utils.get_now():
+                await wait_for_next_import()
             else:
-                await self.run_bulk_import(modified_after=after, modified_before=modified_before)
+                import_modified_after = await self.run_bulk_import(modified_after=import_modified_after, modified_before=modified_before)
 
                 if run_once:
                     break
 
-    async def run_bulk_import(self, modified_after: Optional[datetime] = None, modified_before: Optional[datetime] = None) -> bool:
+    async def run_bulk_import(self, modified_after: Optional[datetime] = None, modified_before: Optional[datetime] = None) -> datetime:
         start = utils.get_now()
         log.bulk_import_start_time(start)
         log.bulk_import_start(modified_after, modified_before)
@@ -117,7 +81,7 @@ class Importer:
 
         log.download_gdrive_file_list_length(len(gdrive_files))
         if not gdrive_files:
-            return False
+            return modified_after
 
         collection_files = create_collection_files(gdrive_files)
         await insert_new_collection_files(collection_files)
@@ -131,47 +95,100 @@ class Importer:
 
         log.downloads_imports_count(queue_items)
 
-        download_worker_thread = self.create_download_worker_thread(queue_items, filesystem=filesystem)
+        download_worker_thread = create_download_worker_thread(
+            queue_items,
+            self.gdrive_client,
+            self.config.download_thread_pool_size,
+            self.config.debug_mode,
+            self.status.cancel_token,
+            filesystem=filesystem,
+        )
         download_worker_thread.start()
 
-        if not self.status.bulk_import_running:
-            self.__import_worker_thread.start()
+        for queue_item in queue_items:
+            await wait_for_item_download(queue_item)
 
-        if not self.status.bulk_database_running:
-            self.__database_worker_thread.start()
+            if queue_item.status.download_timed_out:
+                break
+
+            if queue_item.status.download_error:
+                await update_database(CollectionFileChange(collection_file_id=queue_item.collection_file_id, error=True), queue_item.item_no)
+                continue
+
+            await update_database(
+                CollectionFileChange(collection_file_id=queue_item.collection_file_id, downloaded_at=queue_item.status.downloaded_at, error=False),
+                queue_item.item_no,
+            )
+
+            await import_worker.process_queue_item(queue_item, self.fleet_data_client, self.config.keep_downloaded_files, filesystem=filesystem)
+
+            if queue_item.status.import_error:
+                await update_database(CollectionFileChange(collection_file_id=queue_item.collection_file_id, error=True), queue_item.item_no)
+            else:
+                await update_database(
+                    CollectionFileChange(collection_file_id=queue_item.collection_file_id, imported_at=utils.get_now(), error=False),
+                    queue_item.item_no,
+                )
 
         download_worker_thread.join()
 
-        while not self.database_queue.empty() and not self.import_queue.empty():
-            await asyncio.sleep(1)
-
         end = utils.get_now()
-        log.bulk_import_finish(queue_items, modified_after, modified_before, start, end)
+        log.bulk_import_finish(queue_items, modified_after, modified_before)
         log.bulk_import_finish_time(len(queue_items), start, end)
 
-        return True
+        last_imported_file_modified_date = None
+        for queue_item in queue_items:
+            if not queue_item.status.imported:
+                break
 
-    def create_download_worker_thread(self, queue_items: Iterable[QueueItem], filesystem: FileSystem = FileSystem()) -> threading.Thread:
-        download_worker_thread = threading.Thread(
-            target=download_worker.worker,
-            name="Download worker",
-            args=[
-                queue_items,
-                self.gdrive_client,
-                self.config.download_thread_pool_size,
-                self.database_queue,
-                self.import_queue,
-                self.status.bulk_download_running,
-                60.0,
-                self.status.download_worker_timed_out,
-                self.status.cancel_token,
-                self.config.debug_mode,
-                filesystem,
-            ],
-            daemon=True,
-        )
+            last_imported_file_modified_date = queue_item.gdrive_file.modified_date
 
-        return download_worker_thread
+        return last_imported_file_modified_date
+
+
+async def get_updated_modified_after(modified_after: Optional[datetime] = None):
+    async with DatabaseRepository.get_session() as session:
+        latest_imported_modified_date = await crud.get_latest_imported_gdrive_modified_date(session)
+
+    if latest_imported_modified_date:
+        latest_imported_modified_date = utils.get_next_full_hour(latest_imported_modified_date)
+
+        if modified_after:
+            updated_modified_after = max(modified_after, latest_imported_modified_date)
+        else:
+            updated_modified_after = latest_imported_modified_date
+
+        return updated_modified_after
+
+    return modified_after
+
+
+def create_download_worker_thread(
+    queue_items: Iterable[QueueItem],
+    gdrive_client: GoogleDriveClient,
+    thread_pool_size: int,
+    debug_mode: bool,
+    cancel_token: CancellationToken,
+    filesystem: FileSystem = FileSystem(),
+) -> threading.Thread:
+    download_worker_thread = threading.Thread(
+        target=download_worker.worker,
+        name="Download worker",
+        args=[
+            queue_items,
+            gdrive_client,
+            thread_pool_size,
+            debug_mode,
+            cancel_token,
+        ],
+        kwargs={
+            "worker_timeout": 60.0,
+            "filesystem": filesystem,
+        },
+        daemon=True,
+    )
+
+    return download_worker_thread
 
 
 def create_collection_files(gdrive_files: Iterable[GDriveFile]) -> list[CollectionFileDB]:
@@ -211,10 +228,33 @@ async def insert_new_collection_files(collection_files: Iterable[CollectionFileD
         return result
 
 
-async def wait_for_import():
+async def wait_for_item_download(queue_item: QueueItem):
+    while not queue_item.status.downloaded and not queue_item.status.download_error:
+        await asyncio.sleep(0.1)
+
+
+async def wait_for_item_import(queue_item: QueueItem):
+    while not queue_item.status.imported and not queue_item.status.import_error:
+        await asyncio.sleep(0.1)
+
+
+async def wait_for_next_import():
     now = utils.get_now()
     wait_until = utils.get_next_full_hour(now) + timedelta(minutes=1)
     wait_for_seconds = (wait_until - utils.get_now()).total_seconds()
 
     log.wait_for_import(wait_for_seconds, wait_until)
     await asyncio.sleep(wait_for_seconds)
+
+
+async def update_database(change: CollectionFileChange, item_no: int):
+    async with DatabaseRepository.get_session() as session:
+        collection_file = await crud.get_collection_file(session, change.collection_file_id)
+
+        collection_file.downloaded_at = change.downloaded_at or collection_file.downloaded_at
+        collection_file.imported_at = change.imported_at or collection_file.imported_at
+        if change.error is not None:
+            collection_file.error = change.error
+
+        collection_file = await crud.save_collection_file(session, collection_file)
+    # log.queue_item_update(item_no, change)

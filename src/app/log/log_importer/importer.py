@@ -11,12 +11,10 @@ from .. import LOGGER_BASE
 LOGGER = LOGGER_BASE.getChild("Importer")
 
 
-def bulk_import_finish(
-    queue_items: list[QueueItem], modified_after: Optional[datetime], modified_before: Optional[datetime], start: datetime, end: datetime
-):
+def bulk_import_finish(queue_items: list[QueueItem], modified_after: Optional[datetime], modified_before: Optional[datetime]):
     total_item_count = len(queue_items)
-    downloaded_item_count = len([queue_item for queue_item in queue_items if queue_item.collection_file.downloaded_at])
-    imported_item_count = len([queue_item for queue_item in queue_items if queue_item.collection_file.imported_at])
+    downloaded_item_count = len([queue_item for queue_item in queue_items if queue_item.status.downloaded])
+    imported_item_count = len([queue_item for queue_item in queue_items if queue_item.status.imported])
 
     base_message = f"Finished bulk import. Downloaded {downloaded_item_count}, imported {imported_item_count} out of {total_item_count} files"
 
@@ -104,8 +102,8 @@ def download_gdrive_file_list_params(modified_after: Optional[datetime], modifie
 
 
 def downloads_imports_count(queue_items: list[QueueItem]):
-    download_count = len([_ for _ in queue_items if _.collection_file.downloaded_at is None])
-    import_count = len([_ for _ in queue_items if _.collection_file.imported_at is None])
+    download_count = len([_ for _ in queue_items if not _.status.downloaded])
+    import_count = len([_ for _ in queue_items if not _.status.imported])
     LOGGER.info(f"Downloading {download_count} Collection files and importing {import_count} Collection files.")
 
 

@@ -30,7 +30,7 @@ test_cases_repr = [
 
 @pytest.mark.parametrize(["downloaded_at", "imported_at", "download_error"], test_cases_repr)
 def test_downloaded_at_in_str(downloaded_at: Optional[datetime], imported_at: Optional[datetime], download_error: Optional[bool]):
-    string = repr(CollectionFileChange(downloaded_at=downloaded_at, imported_at=imported_at, download_error=download_error))
+    string = repr(CollectionFileChange(downloaded_at=downloaded_at, imported_at=imported_at, error=download_error))
 
     assert string.startswith(f"<{CollectionFileChange.__name__}")
     assert string.endswith(">")

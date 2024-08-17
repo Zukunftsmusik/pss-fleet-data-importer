@@ -12,4 +12,4 @@ class CollectionFileBase(BaseModel):
     timestamp: datetime
     downloaded_at: Optional[datetime]
     imported_at: Optional[datetime]
-    download_error: Optional[bool]
+    error: Optional[bool]

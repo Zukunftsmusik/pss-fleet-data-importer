@@ -21,14 +21,24 @@ class FromCollectionFileDB:
         if set(gdrive_files_by_id.keys()) != set(collection_files_by_gdrive_file_id):
             raise ValueError
 
-        result = [
-            QueueItem(
+        result = []
+        for item_no, gdrive_file_id in enumerate(gdrive_files_by_id.keys(), 1):
+            gdrive_file = gdrive_files_by_id[gdrive_file_id]
+            collection_file = collection_files_by_gdrive_file_id[gdrive_file_id]
+
+            queue_item = QueueItem(
                 item_no,
-                gdrive_files_by_id[gdrive_file_id],
-                collection_files_by_gdrive_file_id[gdrive_file_id],
+                gdrive_file,
+                collection_file.collection_file_id,
                 target_directory,
                 cancel_token,
             )
-            for item_no, gdrive_file_id in enumerate(gdrive_files_by_id.keys(), 1)
-        ]
+
+            queue_item.status.downloaded.value = bool(collection_file.downloaded_at)
+            queue_item.status.downloaded_at = collection_file.downloaded_at
+            queue_item.status.imported.value = bool(collection_file.imported_at)
+            queue_item.status.imported_at = collection_file.imported_at
+
+            result.append(queue_item)
+
         return result

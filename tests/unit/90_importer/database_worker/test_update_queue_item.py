@@ -38,7 +38,7 @@ async def test_queue_item_is_updated(
     imported_at: Optional[datetime],
     download_error: Optional[bool],
 ):
-    change = CollectionFileChange(downloaded_at=downloaded_at, imported_at=imported_at, download_error=download_error)
+    change = CollectionFileChange(downloaded_at=downloaded_at, imported_at=imported_at, error=download_error)
 
     downloaded_at_before = queue_item.collection_file.downloaded_at
     imported_at_before = queue_item.collection_file.imported_at

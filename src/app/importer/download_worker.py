@@ -1,5 +1,4 @@
 import logging
-import queue
 import random
 import time
 from concurrent.futures import CancelledError, Future, ThreadPoolExecutor
@@ -12,9 +11,7 @@ import pydrive2.files
 from ..core import utils
 from ..core.gdrive import GDriveFile, GoogleDriveClient
 from ..core.models.cancellation_token import CancellationToken, OperationCancelledError
-from ..core.models.collection_file_change import CollectionFileChange
 from ..core.models.filesystem import FileSystem
-from ..core.models.status import StatusFlag
 from ..log.log_importer import download_worker as log
 from ..models.queue_item import QueueItem
 from . import utils as importer_utils
@@ -30,18 +27,11 @@ def worker(
     queue_items: Iterable[QueueItem],
     gdrive_client: GoogleDriveClient,
     thread_pool_size: int,
-    database_queue: queue.Queue,
-    import_queue: queue.Queue,
-    status_flag: StatusFlag,
-    worker_timeout: float,
-    worker_timed_out_flag: StatusFlag,
-    cancel_token: CancellationToken,
     debug_mode: bool,
+    cancel_token: CancellationToken,
+    worker_timeout: float = 60.0,
     filesystem: FileSystem = FileSystem(),
 ):
-    status_flag.value = True
-    worker_timed_out_flag.value = False
-
     log.download_worker_started()
 
     log.thread_pool_setup(thread_pool_size)
@@ -58,7 +48,7 @@ def worker(
 
     log.wait_for_futures()
     for future, queue_item in futures:
-        wait_for_future(future, queue_item, executor, database_queue, import_queue, worker_timed_out_flag, cancel_token, worker_timeout)
+        wait_for_future(future, queue_item, executor, cancel_token, worker_timeout)
 
     if cancel_token.cancelled:
         log.thread_pool_cancel()
@@ -67,16 +57,12 @@ def worker(
         executor.shutdown()
 
     log.download_worker_ended(cancel_token)
-    status_flag.value = False
 
 
 def wait_for_future(
     future: Future,
     queue_item: QueueItem,
     executor: ThreadPoolExecutor,
-    database_queue: queue.Queue,
-    import_queue: queue.Queue,
-    worker_timed_out_flag: StatusFlag,
     cancel_token: CancellationToken,
     timeout: float = 60.0,
 ):
@@ -85,40 +71,33 @@ def wait_for_future(
             future.cancel()
         return
 
-    wait_for_download(future, queue_item, executor, worker_timed_out_flag, timeout)
-    if queue_item.status.downloaded:
-        database_queue.put((queue_item, CollectionFileChange(downloaded_at=utils.get_now(), download_error=queue_item.status.download_error)))
-        import_queue.put(queue_item)
+    wait_for_download(future, queue_item, executor, timeout)
 
 
 def wait_for_download(
     future: Future,
     queue_item: QueueItem,
     executor: ThreadPoolExecutor,
-    worker_timed_out_flag: StatusFlag,
     timeout: float = 60,
 ) -> QueueItem:
     try:
         future.result(timeout=timeout)
     except (CancelledError, OperationCancelledError):
-        queue_item.status.downloaded.value = False
-        queue_item.status.download_error.value = False
+        pass
     except TimeoutError:
-        queue_item.status.downloaded.value = False
         queue_item.status.download_error.value = True
-        worker_timed_out_flag.value = True
+        queue_item.status.download_timed_out.value = True
 
         executor.shutdown(False, cancel_futures=True)
 
         log.future_timeout(queue_item.item_no)
     except Exception as exc:
-        queue_item.status.downloaded.value = False
         queue_item.status.download_error.value = True
 
         log.future_error(queue_item.item_no, exc)
     else:
         queue_item.status.downloaded.value = True
-        queue_item.status.download_error.value = False
+        queue_item.status.downloaded_at = utils.get_now()
 
     return queue_item
 
@@ -190,7 +169,6 @@ def download_gdrive_file(
 
 def file_already_downloaded(queue_item: QueueItem, filesystem: FileSystem = FileSystem()) -> bool:
     if importer_utils.check_if_exists(queue_item.target_file_path, queue_item.gdrive_file.size, filesystem):
-        log.file_exists(queue_item.item_no, queue_item.target_file_path)
         return True
 
     # File also counts as not existing, if the file size differs from the file on gdrive
