@@ -42,7 +42,7 @@ async def process_queue_item(
     try:
         queue_item: QueueItem = import_queue.get(block=False)
     except queue.Empty:
-        await asyncio.sleep(0.1)
+        await asyncio.sleep(0.01)
         return
 
     if skip_file_import_on_error(queue_item, filesystem=filesystem):
