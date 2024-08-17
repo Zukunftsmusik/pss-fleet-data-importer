@@ -14,8 +14,12 @@ def test_create(gdrive_file: GDriveFile, collection_file_db: CollectionFileDB, c
     assert queue_item.collection_file == collection_file_db
     assert isinstance(queue_item.target_directory_path, Path)
     assert queue_item.cancel_token == cancel_token
-    assert queue_item.downloaded is None
-    assert queue_item.error_while_downloading is False
+    assert queue_item.status.downloading.value is False
+    assert queue_item.status.downloaded.value is False
+    assert queue_item.status.download_error.value is False
+    assert queue_item.status.importing.value is False
+    assert queue_item.status.imported.value is False
+    assert queue_item.status.import_error.value is False
     assert queue_item.target_directory_path == Path("/dev/null")
 
 
@@ -32,17 +36,3 @@ def test_properties(
     assert queue_item.collection_file is None
     queue_item.collection_file = collection_file_db
     assert queue_item.collection_file == collection_file_db
-
-    queue_item.downloaded = True
-    assert queue_item.downloaded == True
-    queue_item.downloaded = False
-    assert queue_item.downloaded == False
-    queue_item.downloaded = None
-    assert queue_item.downloaded is None
-
-    queue_item.error_while_downloading = True
-    assert queue_item.error_while_downloading is True
-    queue_item.error_while_downloading = False
-    assert queue_item.error_while_downloading is False
-    queue_item.error_while_downloading = None
-    assert queue_item.error_while_downloading is None

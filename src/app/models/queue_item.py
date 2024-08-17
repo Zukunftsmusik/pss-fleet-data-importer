@@ -5,9 +5,19 @@ from typing import Union
 from ..core.gdrive import GDriveFile
 from ..core.models.cancellation_token import CancellationToken
 from ..core.models.collection_file_change import CollectionFileChange
+from ..core.models.status import StatusFlag
 from ..database import crud
 from ..database.db_repository import DatabaseRepository
 from ..database.models import CollectionFileDB
+
+
+class QueueItemStatus:
+    downloading = StatusFlag("downloading", False)
+    downloaded = StatusFlag("downloaded", False)
+    download_error = StatusFlag("download_error", False)
+    importing = StatusFlag("importing", False)
+    imported = StatusFlag("imported", False)
+    import_error = StatusFlag("import_error", False)
 
 
 class QueueItem:
@@ -29,6 +39,7 @@ class QueueItem:
         self.__target_directory_path: Path = Path(target_directory)
         self.__error_while_downloading: bool = False
         self.__error_while_downloading_lock: Lock = Lock()
+        self.status = QueueItemStatus()
 
     @property
     def collection_file(self) -> CollectionFileDB:

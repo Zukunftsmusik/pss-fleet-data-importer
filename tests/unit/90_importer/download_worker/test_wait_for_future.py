@@ -31,8 +31,8 @@ def test_dont_cancel_future_if_done_and_cancel_token_cancelled(queue_item: Queue
 
 def test_put_queue_item_in_queues_if_downloaded(queue_item: QueueItem, cancel_token: CancellationToken, monkeypatch: pytest.MonkeyPatch):
     def mock_wait_for_download_successful(future, inner_queue_item, executor, worker_timed_out_flag, timeout):
-        queue_item.downloaded = True
-        queue_item.error_while_downloading = False
+        queue_item.status.downloaded.value = True
+        queue_item.status.download_error.value = False
 
     monkeypatch.setattr(download_worker, download_worker.wait_for_download.__name__, mock_wait_for_download_successful)
 
@@ -47,7 +47,7 @@ def test_put_queue_item_in_queues_if_downloaded(queue_item: QueueItem, cancel_to
 
 def test_dont_put_queue_item_in_queues_if_not_downloaded(queue_item: QueueItem, cancel_token: CancellationToken, monkeypatch: pytest.MonkeyPatch):
     def mock_wait_for_download_successful(future, inner_queue_item, executor, worker_timed_out_flag, timeout):
-        queue_item.downloaded = False
+        queue_item.status.downloaded.value = False
 
     monkeypatch.setattr(download_worker, download_worker.wait_for_download.__name__, mock_wait_for_download_successful)
 

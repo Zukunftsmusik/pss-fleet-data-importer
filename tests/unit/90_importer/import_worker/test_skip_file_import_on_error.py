@@ -13,7 +13,7 @@ def test_return_true_if_queue_item_cancelled(queue_item: QueueItem):
 
 
 def test_return_true_if_queue_item_error_while_download(queue_item: QueueItem):
-    queue_item.error_while_downloading = True
+    queue_item.status.download_error.value = True
 
     assert skip_file_import_on_error(queue_item) is True
 

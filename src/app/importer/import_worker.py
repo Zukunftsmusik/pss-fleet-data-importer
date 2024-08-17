@@ -90,7 +90,7 @@ def skip_file_import_on_error(queue_item: QueueItem, filesystem: FileSystem = Fi
     if queue_item.cancel_token.cancelled:
         return True
 
-    if queue_item.error_while_downloading:
+    if queue_item.status.download_error:
         log.skip_file_import_download_error(queue_item.item_no, queue_item.gdrive_file.name)
         return True
 

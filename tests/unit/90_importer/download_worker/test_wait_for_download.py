@@ -17,8 +17,8 @@ def test_set_downloaded_true_error_false_and_return_queue_item_on_success(queue_
 
     returned_queue_item = wait_for_download(Future(), queue_item, None, None)
 
-    assert returned_queue_item.downloaded is True
-    assert returned_queue_item.error_while_downloading is False
+    assert returned_queue_item.status.downloaded.value is True
+    assert returned_queue_item.status.download_error.value is False
     assert id(returned_queue_item) == id(queue_item)
 
 
@@ -30,8 +30,8 @@ def test_set_downloaded_false_error_false_on_future_cancelled(queue_item: QueueI
 
     returned_queue_item = wait_for_download(Future(), queue_item, None, None)
 
-    assert returned_queue_item.downloaded is False
-    assert returned_queue_item.error_while_downloading is False
+    assert returned_queue_item.status.downloaded.value is False
+    assert returned_queue_item.status.download_error.value is False
 
 
 def test_set_downloaded_false_error_false_on_cancel_token_cancelled(queue_item: QueueItem, monkeypatch: pytest.MonkeyPatch):
@@ -42,8 +42,8 @@ def test_set_downloaded_false_error_false_on_cancel_token_cancelled(queue_item: 
 
     returned_queue_item = wait_for_download(Future(), queue_item, None, None)
 
-    assert returned_queue_item.downloaded is False
-    assert returned_queue_item.error_while_downloading is False
+    assert returned_queue_item.status.downloaded.value is False
+    assert returned_queue_item.status.download_error.value is False
 
 
 def test_set_downloaded_false_error_true_on_download_failed_error(queue_item: QueueItem, monkeypatch: pytest.MonkeyPatch):
@@ -54,8 +54,8 @@ def test_set_downloaded_false_error_true_on_download_failed_error(queue_item: Qu
 
     returned_queue_item = wait_for_download(Future(), queue_item, None, None)
 
-    assert returned_queue_item.downloaded is False
-    assert returned_queue_item.error_while_downloading is True
+    assert returned_queue_item.status.downloaded.value is False
+    assert returned_queue_item.status.download_error.value is True
 
 
 def test_set_downloaded_false_error_true_timeout_flag_true_shutdown_executor_on_timeout_error(
@@ -68,7 +68,7 @@ def test_set_downloaded_false_error_true_timeout_flag_true_shutdown_executor_on_
 
     returned_queue_item = wait_for_download(Future(), queue_item, thread_pool_executor_1, status_flag_false)
 
-    assert returned_queue_item.downloaded is False
-    assert returned_queue_item.error_while_downloading is True
+    assert returned_queue_item.status.downloaded.value is False
+    assert returned_queue_item.status.download_error.value is True
     assert status_flag_false.value is True
     assert thread_pool_executor_1._shutdown is True

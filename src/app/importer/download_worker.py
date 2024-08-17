@@ -86,8 +86,8 @@ def wait_for_future(
         return
 
     wait_for_download(future, queue_item, executor, worker_timed_out_flag, timeout)
-    if queue_item.downloaded:
-        database_queue.put((queue_item, CollectionFileChange(downloaded_at=utils.get_now(), download_error=queue_item.error_while_downloading)))
+    if queue_item.status.downloaded:
+        database_queue.put((queue_item, CollectionFileChange(downloaded_at=utils.get_now(), download_error=queue_item.status.download_error)))
         import_queue.put(queue_item)
 
 
@@ -101,24 +101,24 @@ def wait_for_download(
     try:
         future.result(timeout=timeout)
     except (CancelledError, OperationCancelledError):
-        queue_item.downloaded = False
-        queue_item.error_while_downloading = False
+        queue_item.status.downloaded.value = False
+        queue_item.status.download_error.value = False
     except TimeoutError:
-        queue_item.downloaded = False
-        queue_item.error_while_downloading = True
+        queue_item.status.downloaded.value = False
+        queue_item.status.download_error.value = True
         worker_timed_out_flag.value = True
 
         executor.shutdown(False, cancel_futures=True)
 
         log.future_timeout(queue_item.item_no)
     except Exception as exc:
-        queue_item.downloaded = False
-        queue_item.error_while_downloading = True
+        queue_item.status.downloaded.value = False
+        queue_item.status.download_error.value = True
 
         log.future_error(queue_item.item_no, exc)
     else:
-        queue_item.downloaded = True
-        queue_item.error_while_downloading = False
+        queue_item.status.downloaded.value = True
+        queue_item.status.download_error.value = False
 
     return queue_item
 
