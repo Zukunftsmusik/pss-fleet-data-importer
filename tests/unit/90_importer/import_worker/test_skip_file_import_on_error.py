@@ -7,7 +7,7 @@ from src.app.models.queue_item import QueueItem
 
 
 def test_return_true_if_queue_item_cancelled(queue_item: QueueItem):
-    queue_item.cancel_token.cancel()
+    queue_item.status.cancel_token.cancel()
 
     assert skip_file_import_on_error(queue_item) is True
 

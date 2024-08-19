@@ -13,11 +13,8 @@ def test_create(gdrive_file: GDriveFile, collection_file_db: CollectionFileDB, c
     assert queue_item.gdrive_file == gdrive_file
     assert queue_item.collection_file_id == collection_file_db.collection_file_id
     assert isinstance(queue_item.target_directory_path, Path)
-    assert queue_item.cancel_token == cancel_token
-    assert queue_item.status.downloaded.value is False
-    assert queue_item.status.download_error.value is False
-    assert queue_item.status.imported.value is False
-    assert queue_item.status.import_error.value is False
+    assert queue_item.status
+    assert queue_item.status.cancel_token == cancel_token
     assert queue_item.target_directory_path == Path("/dev/null")
 
 

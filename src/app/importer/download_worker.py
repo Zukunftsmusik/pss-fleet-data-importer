@@ -141,7 +141,7 @@ def download_gdrive_file(
         file_contents = download_gdrive_file_contents(
             queue_item.gdrive_file,
             gdrive_client,
-            queue_item.cancel_token,
+            queue_item.status.cancel_token,
             queue_item.item_no,
             max_download_attempts,
             log_stack_trace_on_download_error,
@@ -156,7 +156,7 @@ def download_gdrive_file(
         write_gdrive_file_to_disk(
             file_contents,
             queue_item.target_file_path,
-            queue_item.cancel_token,
+            queue_item.status.cancel_token,
             queue_item.item_no,
             queue_item.gdrive_file.name,
             max_download_attempts,

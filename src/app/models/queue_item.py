@@ -10,7 +10,7 @@ from ..database.models import CollectionFileDB
 
 
 class QueueItemStatus:
-    def __init__(self):
+    def __init__(self, cancel_token: CancellationToken):
         self.downloaded = StatusFlag("downloaded", False)
         self.download_error = StatusFlag("download_error", False)
         self.download_timed_out = StatusFlag("download_timed_out", False)
@@ -20,6 +20,7 @@ class QueueItemStatus:
         self.__downloaded_at_lock = Lock()
         self.__imported_at: datetime = None
         self.__imported_at_lock = Lock()
+        self.cancel_token = cancel_token
 
     @property
     def downloaded_at(self) -> Optional[datetime]:
@@ -36,7 +37,7 @@ class QueueItemStatus:
         with self.__imported_at_lock:
             return self.__imported_at
 
-    @downloaded_at.setter
+    @imported_at.setter
     def imported_at(self, value: datetime):
         with self.__imported_at_lock:
             self.__imported_at = value
@@ -51,12 +52,11 @@ class QueueItem:
         target_directory: Union[Path, str],
         cancel_token: CancellationToken,
     ):
-        self.cancel_token: CancellationToken = cancel_token
         self.item_no: int = item_no
         self.gdrive_file: GDriveFile = gdrive_file
         self.collection_file_id: CollectionFileDB = collection_file_id
         self.target_directory_path: Path = Path(target_directory)
-        self.status = QueueItemStatus()
+        self.status = QueueItemStatus(cancel_token)
 
     @property
     def target_file_path(self) -> Path:

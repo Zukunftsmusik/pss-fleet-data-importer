@@ -46,7 +46,7 @@ async def import_file(fleet_data_client: PssFleetDataClient, queue_item: QueueIt
 
 
 def skip_file_import_on_error(queue_item: QueueItem, filesystem: FileSystem = FileSystem()) -> bool:
-    if queue_item.cancel_token.cancelled:
+    if queue_item.status.cancel_token.cancelled:
         return True
 
     if queue_item.status.download_error:
