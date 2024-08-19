@@ -76,10 +76,7 @@ class GoogleDriveClient:
         if modified_before:
             criteria.append(f"modifiedDate < '{modified_before.isoformat()}'")
 
-        params = {
-            "orderBy": "createdDate",
-            "q": " and ".join(criteria),
-        }
+        params = {"q": " and ".join(criteria)}
 
         google_drive_files: list[GoogleDriveFile] = self.__drive.ListFile(param=params).GetList()
         file_list = FromGoogleDriveFile.to_gdrive_files(google_drive_files)
