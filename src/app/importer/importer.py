@@ -1,5 +1,4 @@
 import asyncio
-import queue
 import threading
 from datetime import datetime, timedelta
 from typing import Iterable, Optional
@@ -16,6 +15,7 @@ from ..core.models.collection_file_change import CollectionFileChange
 from ..core.models.filesystem import FileSystem
 from ..database import DatabaseRepository, crud
 from ..database.models import CollectionFileDB
+from ..database.unit_of_work import AbstractUnitOfWork, SqlModelUnitOfWork
 from ..log.log_importer import importer as log
 from ..models import ImportStatus, QueueItem
 from . import download_worker, import_worker
@@ -218,21 +218,28 @@ def get_gdrive_file_list(
     return gdrive_files
 
 
-async def insert_new_collection_files(collection_files: Iterable[CollectionFileDB]):
+async def insert_new_collection_files(collection_files: Iterable[CollectionFileDB], uow: Optional[AbstractUnitOfWork] = None):
+    uow = uow or SqlModelUnitOfWork()
+
     log.database_entries_create()
-    async with DatabaseRepository.get_session() as session:
-        existing_collection_files = await crud.get_collection_files_by_gdrive_file_ids(
-            session, [collection_file.gdrive_file_id for collection_file in collection_files]
+    async with uow:
+        existing_collection_files = await uow.collection_files.list_files(
+            gdrive_file_ids=[collection_file.gdrive_file_id for collection_file in collection_files]
         )
         existing_gdrive_file_ids = [collection_file.gdrive_file_id for collection_file in existing_collection_files]
 
         new_collection_files = [
             collection_file for collection_file in collection_files if collection_file.gdrive_file_id not in existing_gdrive_file_ids
         ]
-        new_collection_files = await crud.save_collection_files(session, new_collection_files)
 
-        result = list(existing_collection_files)
-        result.extend(new_collection_files)
+        for collection_file in new_collection_files:
+            uow.collection_files.add(collection_file)
+
+        await uow.commit()
+
+        new_collection_files = await uow.collection_files.refresh_files(new_collection_files)
+
+        result = list(existing_collection_files) + new_collection_files
         return result
 
 
@@ -255,14 +262,18 @@ async def wait_for_next_import():
     await asyncio.sleep(wait_for_seconds)
 
 
-async def update_database(change: CollectionFileChange, item_no: int):
-    async with DatabaseRepository.get_session() as session:
-        collection_file = await crud.get_collection_file(session, change.collection_file_id)
+async def update_database(change: CollectionFileChange, item_no: int, uow: Optional[AbstractUnitOfWork] = None):
+    uow = uow or SqlModelUnitOfWork()
+
+    async with uow:
+        collection_file = await uow.collection_files.get_by_id(change.collection_file_id)
 
         if change.imported is not None:
             collection_file.imported = change.imported
         if change.error is not None:
             collection_file.error = change.error
 
-        collection_file = await crud.save_collection_file(session, collection_file)
-    log.queue_item_update(item_no, change)
+        collection_file = uow.collection_files.add(collection_file)
+        await uow.commit()
+
+        log.queue_item_update(item_no, change)

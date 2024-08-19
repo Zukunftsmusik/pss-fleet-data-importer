@@ -34,7 +34,8 @@ class FromCollectionFileDB:
                 cancel_token,
             )
 
-            queue_item.status.imported.value = collection_file.imported
+            if collection_file.imported is not None:
+                queue_item.status.imported.value = collection_file.imported
 
             result.append(queue_item)
 

@@ -5,14 +5,18 @@ from dataclasses import dataclass
 from datetime import datetime, timedelta
 from hashlib import md5
 from pathlib import Path
-from typing import Generator, Optional, Union
+from typing import Generator, Iterable, Optional, Union
 
 import yaml
 from pss_fleet_data.models.client_models import CollectionMetadata
 
+from src.app.adapters.repository import AbstractCollectionFileRepository
 from src.app.core import utils
 from src.app.core.config import ConfigBase
 from src.app.core.gdrive import GDriveFile
+from src.app.database.models import CollectionFileDB
+from src.app.database.unit_of_work import AbstractUnitOfWork
+from src.app.importer.importer import Importer
 
 
 @dataclass(frozen=False)
@@ -121,7 +125,88 @@ class FakeFileSystem:
         self.__files[Path(path)] = content
 
 
-def create_fake_gdrive_file(file_id: Optional[str] = None, file_name: Optional[str] = None, modified_date: Optional[datetime] = None):
+class FakeImporter(Importer):
+    config: FakeConfig
+    gdrive_client: FakeGoogleDriveClient
+    pss_fleet_data_client: FakePssFleetDataClient
+    filesystem: FakeFileSystem
+
+
+class FakeCollectionFileRepository(AbstractCollectionFileRepository):
+    def __init__(self, collection_files: Iterable[CollectionFileDB]):
+        self._collection_files: list[CollectionFileDB] = list(collection_files)
+
+    def add(self, collection_file: CollectionFileDB):
+        self._collection_files.append(CollectionFileDB(**collection_file.model_dump()))
+
+    async def get_by_id(self, collection_file_id: int) -> Optional[CollectionFileDB]:
+        collection_files = [collection_file for collection_file in self._collection_files if collection_file.collection_file_id == collection_file_id]
+        if collection_files:
+            return collection_files[0]
+        return None
+
+    async def get_latest_imported_gdrive_modified_date(self) -> Optional[datetime]:
+        collection_files = [collection_file for collection_file in self._collection_files if collection_file.imported]
+        if collection_files:
+            result = sorted(collection_files, key=lambda collection_file: collection_file.gdrive_modified_date, reverse=True)
+            return result[0]
+        return None
+
+    async def list_files(self, imported: Optional[bool] = None, gdrive_file_ids: Optional[list[str]] = None) -> list[CollectionFileDB]:
+        collection_files = list(self._collection_files)
+
+        if imported is not None:
+            collection_files = [collection_file for collection_file in self._collection_files if collection_file.imported is imported]
+
+        if gdrive_file_ids:
+            collection_files = [collection_file for collection_file in self._collection_files if collection_file.gdrive_file_id in gdrive_file_ids]
+
+        return collection_files
+
+    async def refresh_files(self, collection_files: Iterable[CollectionFileDB]) -> list[CollectionFileDB]:
+        gdrive_file_ids = [collection_file.gdrive_file_id for collection_file in collection_files]
+        return [collection_file for collection_file in self._collection_files if collection_file.gdrive_file_id in gdrive_file_ids]
+
+
+class FakeUnitOfWork(AbstractUnitOfWork):
+    def __init__(self):
+        self.collection_files = FakeCollectionFileRepository([])
+        self.committed = False
+
+    async def commit(self):
+        collection_files: list[CollectionFileDB] = self.collection_files._collection_files
+        for collection_file in collection_files:
+            if collection_file.collection_file_id is None:
+                collection_file.collection_file_id = (
+                    max(
+                        (collection_file.collection_file_id for collection_file in collection_files if collection_file.collection_file_id is not None)
+                    )
+                    + 1
+                )
+        self.committed = True
+
+    async def rollback(self):
+        pass
+
+
+def create_fake_collection_file(collection_file_id: Optional[int] = None, gdrive_file: Optional[Union[GDriveFile, FakeGDriveFile]] = None):
+    gdrive_file = gdrive_file or create_fake_gdrive_file()
+
+    return CollectionFileDB(
+        collection_file_id=collection_file_id,
+        gdrive_file_id=gdrive_file.id,
+        file_name=gdrive_file.name,
+        gdrive_modified_date=gdrive_file.modified_date,
+        timestamp=utils.extract_timestamp_from_gdrive_file_name(gdrive_file.name),
+    )
+
+
+def create_fake_gdrive_file(
+    file_id: Optional[str] = None,
+    file_name: Optional[str] = None,
+    modified_date: Optional[datetime] = None,
+    get_content_exception: Exception = None,
+):
     if modified_date:
         timestamp = modified_date.replace(second=0)
     else:
@@ -148,4 +233,4 @@ def create_fake_gdrive_file(file_id: Optional[str] = None, file_name: Optional[s
     )
     file_size = len(content)
 
-    return FakeGDriveFile(file_id, file_name, file_size, modified_date, content)
+    return FakeGDriveFile(file_id, file_name, file_size, modified_date, content, get_content_exception=get_content_exception)

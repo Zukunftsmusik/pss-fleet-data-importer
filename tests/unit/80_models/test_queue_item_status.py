@@ -1,10 +1,7 @@
 from datetime import datetime
-from pathlib import Path
 
-from src.app.core.gdrive import GDriveFile
 from src.app.core.models.cancellation_token import CancellationToken
 from src.app.core.models.status import StatusFlag
-from src.app.database.models import CollectionFileDB
 from src.app.models.queue_item import QueueItemStatus
 
 

@@ -29,8 +29,8 @@ def upgrade() -> None:
         sa.Column("file_name", sqlmodel.sql.sqltypes.AutoString(), nullable=False),
         sa.Column("gdrive_modified_date", sa.DateTime(), nullable=False),
         sa.Column("timestamp", sa.DateTime(), nullable=False),
-        sa.Column("imported", sa.Boolean(), nullable=True),
-        sa.Column("error", sa.Boolean(), nullable=True),
+        sa.Column("imported", sa.Boolean(), default=False),
+        sa.Column("error", sa.Boolean(), default=False),
         sa.PrimaryKeyConstraint("id"),
     )
     op.create_index(op.f("ix_collection_file_file_name"), "collection_file", ["file_name"], unique=True)

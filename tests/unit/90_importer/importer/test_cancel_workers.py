@@ -5,8 +5,8 @@ import pytest
 from src.app.importer import Importer
 
 
-def test_cancel_workers(importer: Importer, caplog: pytest.LogCaptureFixture):
+def test_cancel_workers(fake_importer: Importer, caplog: pytest.LogCaptureFixture):
     with caplog.at_level(logging.WARN):
-        importer.cancel_workers()
+        fake_importer.cancel_workers()
     assert "Cancelling workers" in caplog.text
-    assert importer.status.cancelled
+    assert fake_importer.status.cancelled

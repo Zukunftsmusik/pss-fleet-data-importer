@@ -1,9 +1,7 @@
 import pytest
-from pss_fleet_data import PssFleetDataClient
 
 from src.app.core import config
-from src.app.importer import Importer
-from tests.fake_classes import FakePssFleetDataClient
+from tests.fake_classes import FakeFileSystem, FakeGoogleDriveClient, FakeImporter, FakePssFleetDataClient
 
 
 @pytest.fixture(scope="function")
@@ -12,5 +10,10 @@ def fake_fleet_data_client() -> FakePssFleetDataClient:
 
 
 @pytest.fixture(scope="function")
-def importer(configuration: config.Config, fake_fleet_data_client: FakePssFleetDataClient) -> Importer:
-    return Importer(configuration, None, fake_fleet_data_client)
+def fake_importer(
+    configuration: config.Config,
+    fake_gdrive_client: FakeGoogleDriveClient,
+    fake_fleet_data_client: FakePssFleetDataClient,
+    filesystem: FakeFileSystem,
+) -> FakeImporter:
+    return FakeImporter(configuration, fake_gdrive_client, fake_fleet_data_client, filesystem=filesystem)

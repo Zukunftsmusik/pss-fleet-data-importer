@@ -1,5 +1,4 @@
 from datetime import datetime
-from typing import Optional
 
 from sqlmodel import Field, SQLModel
 
@@ -14,8 +13,8 @@ class CollectionFileDB(SQLModel, CollectionFileBase, table=True):
     file_name: str = Field(index=True, unique=True)
     gdrive_modified_date: datetime = Field(index=True)
     timestamp: datetime = Field(index=True, unique=True)
-    imported: Optional[bool] = Field(default=None, nullable=True)
-    error: Optional[bool] = Field(default=None, nullable=True)
+    imported: bool = Field(default=False)
+    error: bool = Field(default=False)
 
 
 __all__ = [
