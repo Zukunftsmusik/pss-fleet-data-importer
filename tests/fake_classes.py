@@ -1,8 +1,11 @@
 import json
+import random
+import uuid
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import datetime, timedelta
+from hashlib import md5
 from pathlib import Path
-from typing import Any, Generator, Mapping, Optional, Union
+from typing import Generator, Optional, Union
 
 import yaml
 from pss_fleet_data import PssFleetDataClient
@@ -10,7 +13,7 @@ from pss_fleet_data.models.client_models import CollectionMetadata
 
 from src.app.core import utils
 from src.app.core.config import ConfigBase
-from src.app.core.gdrive import GDriveFile, GoogleDriveClient
+from src.app.core.gdrive import GDriveFile
 
 
 @dataclass(frozen=False)
@@ -18,33 +21,34 @@ class FakeConfig(ConfigBase):
     pass
 
 
-class FakeGoogleDriveClient(GoogleDriveClient):
-    def __init__(self):
-        self.files: list[FakeGDriveFile] = []
-
-    def list_files_by_modified_date(
-        self,
-        modified_after: Optional[datetime] = None,
-        modified_before: Optional[datetime] = None,
-    ) -> Generator[GDriveFile, None, None]:
-        for f in (
-            file
-            for file in self.files
-            if (not modified_after or file.modified_date > modified_after) and (not modified_before or file.modified_date < modified_before)
-        ):
-            yield f
-
-
-class FakeGDriveFile(GDriveFile):
+class FakeGDriveFile:
     def __init__(self, file_id: str, file_name: str, file_size: int, modified_date: datetime, content: str):
         self.id = file_id
         self.name = file_name
         self.size = file_size
         self.modified_date = modified_date
         self.content = content
+        self.md5_checksum = md5(content).hexdigest()
 
     def get_content_string(self, mimetype: Optional[str] = None, encoding: str = "utf-8", remove_bom: bool = False):
         return self.content
+
+
+class FakeGoogleDriveClient:
+    def __init__(self):
+        self.files: list[Union[FakeGDriveFile, GDriveFile]] = []
+
+    def list_files_by_modified_date(
+        self,
+        modified_after: Optional[datetime] = None,
+        modified_before: Optional[datetime] = None,
+    ) -> Generator[Union[FakeGDriveFile, GDriveFile], None, None]:
+        for f in (
+            file
+            for file in self.files
+            if (not modified_after or file.modified_date > modified_after) and (not modified_before or file.modified_date < modified_before)
+        ):
+            yield f
 
 
 class FakePssFleetDataClient(PssFleetDataClient):
@@ -111,3 +115,33 @@ class FakeFileSystem:
 
     def write(self, path: Union[Path, str], content: str, _: str = "w"):
         self.__files[Path(path)] = content
+
+
+def create_fake_gdrive_file(file_id: Optional[str] = None, file_name: Optional[str] = None, modified_date: Optional[datetime] = None):
+    if modified_date:
+        timestamp = modified_date.replace(second=0)
+    else:
+        timestamp = datetime.fromordinal(random.randint(737342, 739129)).replace(hour=23, minute=59)
+
+    file_id = file_id or str(uuid.uuid4())
+    file_name = file_name or timestamp.strftime("pss-top-100_%Y%m%d-%H%M%S.json")
+    modified_date = modified_date or timestamp + timedelta(seconds=30)
+
+    content = json.dumps(
+        {
+            "meta": {
+                "timestamp": timestamp,
+                "duration": 5.0,
+                "fleet_count": 0,
+                "user_count": 0,
+                "tournament_running": True,
+                "schema_version": 9,
+                "max_tournament_battle_attempts": 6,
+            },
+            "fleets": [],
+            "users": [],
+        }
+    )
+    file_size = len(content)
+
+    return FakeGDriveFile(file_id, file_name, file_size, modified_date, content)
