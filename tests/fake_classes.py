@@ -21,15 +21,19 @@ class FakeConfig(ConfigBase):
 
 
 class FakeGDriveFile:
-    def __init__(self, file_id: str, file_name: str, file_size: int, modified_date: datetime, content: str):
+    def __init__(self, file_id: str, file_name: str, file_size: int, modified_date: datetime, content: str, get_content_exception: Exception = None):
         self.id = file_id
         self.name = file_name
         self.size = file_size
         self.modified_date = modified_date
         self.content = content
         self.md5_checksum = md5(content.encode()).hexdigest()
+        self.exception = get_content_exception
 
     def get_content_string(self, mimetype: Optional[str] = None, encoding: str = "utf-8", remove_bom: bool = False):
+        if self.exception:
+            raise self.exception
+
         return self.content
 
 
