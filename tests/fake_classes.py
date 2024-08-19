@@ -2,11 +2,13 @@ import json
 from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
-from typing import Any, Mapping, Optional, Union
+from typing import Any, Generator, Mapping, Optional, Union
 
 import yaml
 from pss_fleet_data import PssFleetDataClient
+from pss_fleet_data.models.client_models import CollectionMetadata
 
+from src.app.core import utils
 from src.app.core.config import ConfigBase
 from src.app.core.gdrive import GDriveFile, GoogleDriveClient
 
@@ -18,7 +20,19 @@ class FakeConfig(ConfigBase):
 
 class FakeGoogleDriveClient(GoogleDriveClient):
     def __init__(self):
-        pass
+        self.files: list[FakeGDriveFile] = []
+
+    def list_files_by_modified_date(
+        self,
+        modified_after: Optional[datetime] = None,
+        modified_before: Optional[datetime] = None,
+    ) -> Generator[GDriveFile, None, None]:
+        for f in (
+            file
+            for file in self.files
+            if (not modified_after or file.modified_date > modified_after) and (not modified_before or file.modified_date < modified_before)
+        ):
+            yield f
 
 
 class FakeGDriveFile(GDriveFile):
@@ -29,19 +43,34 @@ class FakeGDriveFile(GDriveFile):
         self.modified_date = modified_date
         self.content = content
 
-    def get_content_string(self, *args: Any, **kwargs: Mapping[str, Any]):
+    def get_content_string(self, mimetype: Optional[str] = None, encoding: str = "utf-8", remove_bom: bool = False):
         return self.content
 
 
 class FakePssFleetDataClient(PssFleetDataClient):
     def __init__(self):
-        pass
+        self.collections: dict[int, CollectionMetadata] = {}
 
+    async def ping(self) -> str:
+        return "Pong!"
 
-@dataclass(frozen=False)
-class FakeStatResult:
-    st_size: int = 0
-    st_mode: int = 0
+    async def upload_collection(self, file_path: Union[Path, str], api_key: Optional[str] = None) -> CollectionMetadata:
+        file_name = Path(file_path).name
+        collection_id = len(self.collections) + 1
+        timestamp = utils.extract_timestamp_from_gdrive_file_name(file_name)
+
+        metadata = CollectionMetadata(
+            collection_id=collection_id,
+            timestamp=timestamp,
+            duration=5.0,
+            fleet_count=1,
+            user_count=1,
+            tournament_running=False,
+            data_version=9,
+        )
+
+        self.collections[collection_id] = metadata
+        return metadata
 
 
 class FakeFileSystem:
