@@ -10,6 +10,5 @@ class CollectionFileBase(BaseModel):
     file_name: str
     gdrive_modified_date: datetime
     timestamp: datetime
-    downloaded_at: Optional[datetime]
-    imported_at: Optional[datetime]
+    imported: Optional[bool]
     error: Optional[bool]

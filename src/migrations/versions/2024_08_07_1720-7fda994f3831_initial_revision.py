@@ -29,8 +29,7 @@ def upgrade() -> None:
         sa.Column("file_name", sqlmodel.sql.sqltypes.AutoString(), nullable=False),
         sa.Column("gdrive_modified_date", sa.DateTime(), nullable=False),
         sa.Column("timestamp", sa.DateTime(), nullable=False),
-        sa.Column("downloaded_at", sa.DateTime(), nullable=True),
-        sa.Column("imported_at", sa.DateTime(), nullable=True),
+        sa.Column("imported", sa.Boolean(), nullable=True),
         sa.Column("error", sa.Boolean(), nullable=True),
         sa.PrimaryKeyConstraint("id"),
     )
