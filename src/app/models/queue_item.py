@@ -10,13 +10,12 @@ from ..database.models import CollectionFileDB
 
 
 class QueueItemStatus:
-    downloaded = StatusFlag("downloaded", False)
-    download_error = StatusFlag("download_error", False)
-    download_timed_out = StatusFlag("download_timed_out", False)
-    imported = StatusFlag("imported", False)
-    import_error = StatusFlag("import_error", False)
-
     def __init__(self):
+        self.downloaded = StatusFlag("downloaded", False)
+        self.download_error = StatusFlag("download_error", False)
+        self.download_timed_out = StatusFlag("download_timed_out", False)
+        self.imported = StatusFlag("imported", False)
+        self.import_error = StatusFlag("import_error", False)
         self.__downloaded_at: datetime = None
         self.__downloaded_at_lock = Lock()
         self.__imported_at: datetime = None

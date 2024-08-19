@@ -8,7 +8,6 @@ from pathlib import Path
 from typing import Generator, Optional, Union
 
 import yaml
-from pss_fleet_data import PssFleetDataClient
 from pss_fleet_data.models.client_models import CollectionMetadata
 
 from src.app.core import utils
@@ -28,7 +27,7 @@ class FakeGDriveFile:
         self.size = file_size
         self.modified_date = modified_date
         self.content = content
-        self.md5_checksum = md5(content).hexdigest()
+        self.md5_checksum = md5(content.encode()).hexdigest()
 
     def get_content_string(self, mimetype: Optional[str] = None, encoding: str = "utf-8", remove_bom: bool = False):
         return self.content
@@ -51,7 +50,7 @@ class FakeGoogleDriveClient:
             yield f
 
 
-class FakePssFleetDataClient(PssFleetDataClient):
+class FakePssFleetDataClient:
     def __init__(self):
         self.collections: dict[int, CollectionMetadata] = {}
 
@@ -69,6 +68,7 @@ class FakePssFleetDataClient(PssFleetDataClient):
             duration=5.0,
             fleet_count=1,
             user_count=1,
+            schema_version=9,
             tournament_running=False,
             data_version=9,
         )
@@ -130,7 +130,7 @@ def create_fake_gdrive_file(file_id: Optional[str] = None, file_name: Optional[s
     content = json.dumps(
         {
             "meta": {
-                "timestamp": timestamp,
+                "timestamp": timestamp.isoformat().replace("T", ""),
                 "duration": 5.0,
                 "fleet_count": 0,
                 "user_count": 0,

@@ -57,9 +57,9 @@ async def main():
 
     if await importer.check_api_server_connection():
         try:
-            await importer.run_import_loop(modified_before=datetime(2019, 10, 20))
-            # asyncio.run(importer.run_import_loop(modified_after=datetime(2021, 11, 11), modified_before=datetime(2021, 11, 12)))
-            # asyncio.run(importer.run_import_loop())
+            # await importer.run_import_loop(modified_after=datetime(2024, 8, 16, 12), modified_before=datetime(2024, 8, 16, 13))
+            await importer.run_import_loop(run_once=True, modified_before=datetime(2019, 10, 20))
+            # await importer.run_import_loop()
         except KeyboardInterrupt:
             logger_base.aborted()
             importer.cancel_workers()

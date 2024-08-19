@@ -1,26 +1,9 @@
-import queue
-
 from pss_fleet_data import PssFleetDataClient
 from pss_fleet_data.core.exceptions import ApiError, NonUniqueTimestampError
 
 from ..core.models.filesystem import FileSystem
 from ..log.log_importer import import_worker as log
-from ..models import CancellationToken, QueueItem
-
-
-async def worker(
-    import_queue: queue.Queue,
-    fleet_data_client: PssFleetDataClient,
-    cancel_token: CancellationToken,
-    keep_downloaded_files: bool = False,
-    filesystem: FileSystem = FileSystem(),
-):
-    log.import_worker_started()
-
-    while not cancel_token.cancelled:
-        await process_queue_item(fleet_data_client, keep_downloaded_files, filesystem=filesystem)
-
-    log.import_worker_ended(cancel_token)
+from ..models import QueueItem
 
 
 async def process_queue_item(

@@ -193,7 +193,7 @@ def download_gdrive_file_contents(
         log.downloading_gdrive_file(attempt, item_no, gdrive_file.name)
 
         try:
-            file_contents = gdrive_client.get_file_contents(gdrive_file)
+            file_contents = gdrive_file.get_content_string()
         except (pydrive2.files.ApiRequestError, pydrive2.files.FileNotDownloadableError) as exc:
             download_error = exc
             sleep_for = timedelta(seconds=2 ^ attempt, microseconds=random.randint(0, 1000000))

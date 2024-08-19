@@ -16,5 +16,3 @@ def test_init(configuration: Config):
     assert importer.gdrive_client == "gdrive_client"
     assert importer.fleet_data_client == "pss_fleet_data_client"
     assert isinstance(importer.status, ImportStatus)
-    assert isinstance(importer.import_queue, queue.Queue)
-    assert isinstance(importer.database_queue, queue.Queue)

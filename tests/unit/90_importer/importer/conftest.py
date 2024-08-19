@@ -7,10 +7,10 @@ from tests.fake_classes import FakePssFleetDataClient
 
 
 @pytest.fixture(scope="function")
-def mock_fleet_data_client() -> FakePssFleetDataClient:
+def fake_fleet_data_client() -> FakePssFleetDataClient:
     return FakePssFleetDataClient()
 
 
 @pytest.fixture(scope="function")
-def importer(configuration: config.Config, mock_fleet_data_client: PssFleetDataClient) -> Importer:
-    return Importer(configuration, None, mock_fleet_data_client)
+def importer(configuration: config.Config, fake_fleet_data_client: FakePssFleetDataClient) -> Importer:
+    return Importer(configuration, None, fake_fleet_data_client)

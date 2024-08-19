@@ -5,6 +5,7 @@ import string
 import time
 import uuid
 from datetime import datetime
+from hashlib import md5
 from queue import Queue
 
 import googleapiclient.errors
@@ -135,6 +136,7 @@ def google_drive_file(
     google_drive_file_size: int,
     google_drive_file_name: str,
     google_drive_file_modified_date: datetime,
+    google_drive_file_content: str,
 ) -> GoogleDriveFile:
     return GoogleDriveFile(
         None,
@@ -142,6 +144,7 @@ def google_drive_file(
             "id": google_drive_file_id,
             "fileSize": str(google_drive_file_size),
             "title": google_drive_file_name,
+            "md5Checksum": md5(google_drive_file_content.encode()).hexdigest(),
             "modifiedDate": google_drive_file_modified_date.isoformat(),
         },
         uploaded=True,

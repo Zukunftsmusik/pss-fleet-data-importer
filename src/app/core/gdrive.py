@@ -23,7 +23,14 @@ class GDriveFile:
         self.__google_drive_file: GoogleDriveFile = google_drive_file
 
     def get_content_string(self, mimetype: Optional[str] = None, encoding: str = "utf-8", remove_bom: bool = False):
-        return self.__google_drive_file.GetContentString(mimetype, encoding, remove_bom)
+        try:
+            with log.download_file(self.name):
+                result = self.__google_drive_file.GetContentString(mimetype, encoding, remove_bom)
+        except (ApiRequestError, FileNotDownloadableError) as exc:
+            log.download_file_error(self.name, exc)
+            raise exc
+
+        return result
 
 
 class GoogleDriveClient:
@@ -55,16 +62,6 @@ class GoogleDriveClient:
 
         self.__gauth: pydrive2.auth.GoogleAuth = None
         self.__drive: pydrive2.drive.GoogleDrive = None
-
-    def get_file_contents(self, file: GDriveFile) -> str:
-        try:
-            with log.download_file(file.name):
-                result = file.get_content_string()
-        except (ApiRequestError, FileNotDownloadableError) as exc:
-            log.download_file_error(file.name, exc)
-            raise exc
-
-        return result
 
     def list_files_by_modified_date(
         self, modified_after: Optional[datetime] = None, modified_before: Optional[datetime] = None

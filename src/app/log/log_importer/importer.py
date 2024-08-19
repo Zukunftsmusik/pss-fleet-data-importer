@@ -4,6 +4,7 @@ from pathlib import Path
 from typing import Optional, Union
 
 from ...core.models.cancellation_token import CancellationToken
+from ...core.models.collection_file_change import CollectionFileChange
 from ...models.queue_item import QueueItem
 from .. import LOGGER_BASE
 
@@ -105,6 +106,10 @@ def downloads_imports_count(queue_items: list[QueueItem]):
     download_count = len([_ for _ in queue_items if not _.status.downloaded])
     import_count = len([_ for _ in queue_items if not _.status.imported])
     LOGGER.info(f"Downloading {download_count} Collection files and importing {import_count} Collection files.")
+
+
+def queue_item_update(item_no: int, change: CollectionFileChange):
+    LOGGER.debug("Updated queue item no. %i: %s", item_no, change)
 
 
 def queue_items_create():

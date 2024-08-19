@@ -137,12 +137,11 @@ async def get_collection_file_by_timestamp(session: AsyncSession, timestamp: dat
         return collection
 
 
-async def get_collection_files(session: AsyncSession, downloaded: Optional[bool] = None, imported: Optional[bool] = None) -> list[CollectionFileDB]:
+async def get_collection_files(session: AsyncSession, imported: Optional[bool] = None) -> list[CollectionFileDB]:
     """Retrieves CollectionFiles meeting the specified criteria, ordered ascending by `CollectionFileDB.timestamp`.
 
     Args:
         session (AsyncSession): The database session to use.
-        downloaded (bool, optional): If specified returns only CollectionFiles that have already been downloaded or not.
         imported (bool, optional): If specified returns only CollectionFiles that have already been imported or not.
 
     Returns:
@@ -151,15 +150,8 @@ async def get_collection_files(session: AsyncSession, downloaded: Optional[bool]
     async with session:
         query = select(CollectionFileDB).order_by(asc(CollectionFileDB.timestamp))
 
-        if downloaded is True:
-            query = query.where(is_not(CollectionFileDB.downloaded_at, None))
-        elif downloaded is False:
-            query = query.where(is_(CollectionFileDB.downloaded_at, None))
-
-        if imported is True:
-            query = query.where(is_not(CollectionFileDB.imported_at, None))
-        elif imported is False:
-            query = query.where(is_(CollectionFileDB.imported_at, None))
+        if imported is not None:
+            query = query.where(is_(CollectionFileDB.imported, imported))
 
         results = await session.exec(query)
         return list(results.all())
@@ -181,25 +173,9 @@ async def get_latest_collection_file(session: AsyncSession) -> Optional[Collecti
         return result.first()
 
 
-async def get_latest_downloaded_collection_file(session: AsyncSession) -> Optional[CollectionFileDB]:
-    """Retrieves the CollectionFile with the most recent `timestamp`, which has already been downloaded.
-
-    Args:
-        session (AsyncSession): The database session to use.
-
-    Returns:
-        Optional[CollectionFileDB]: The CollectionFile with the most recent `timestamp`, which has already been downloaded, or `None` if the database is empty.
-    """
-    async with session:
-        query = select(CollectionFileDB).where(is_not(CollectionFileDB.downloaded_at, None)).order_by(desc(CollectionFileDB.timestamp)).limit(1)
-
-        result = await session.exec(query)
-        return result.first()
-
-
 async def get_latest_imported_gdrive_modified_date(session: AsyncSession) -> Optional[datetime]:
     async with session:
-        query = select(CollectionFileDB).where(is_not(CollectionFileDB.imported_at, None)).order_by(desc(CollectionFileDB.gdrive_modified_date))
+        query = select(CollectionFileDB).where(is_not(CollectionFileDB.imported, None)).order_by(desc(CollectionFileDB.gdrive_modified_date))
         result = await session.exec(query)
         collection_file = result.first()
         if collection_file:
@@ -217,7 +193,7 @@ async def get_latest_imported_collection_file(session: AsyncSession) -> Optional
         Optional[CollectionFileDB]: The CollectionFile with the most recent `timestamp`, which has already been imported, or `None` if the database is empty.
     """
     async with session:
-        query = select(CollectionFileDB).where(is_not(CollectionFileDB.imported_at, None)).order_by(desc(CollectionFileDB.timestamp)).limit(1)
+        query = select(CollectionFileDB).where(is_not(CollectionFileDB.imported, None)).order_by(desc(CollectionFileDB.timestamp)).limit(1)
 
         result = await session.exec(query)
         return result.first()
@@ -272,7 +248,6 @@ __all__ = [
     get_collection_files.__name__,
     get_collection_files_by_gdrive_file_ids.__name__,
     get_latest_collection_file.__name__,
-    get_latest_downloaded_collection_file.__name__,
     get_latest_imported_collection_file.__name__,
     save_collection_file.__name__,
     save_collection_files.__name__,

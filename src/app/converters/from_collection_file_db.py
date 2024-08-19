@@ -34,10 +34,7 @@ class FromCollectionFileDB:
                 cancel_token,
             )
 
-            queue_item.status.downloaded.value = bool(collection_file.downloaded_at)
-            queue_item.status.downloaded_at = collection_file.downloaded_at
-            queue_item.status.imported.value = bool(collection_file.imported_at)
-            queue_item.status.imported_at = collection_file.imported_at
+            queue_item.status.imported.value = collection_file.imported
 
             result.append(queue_item)
 

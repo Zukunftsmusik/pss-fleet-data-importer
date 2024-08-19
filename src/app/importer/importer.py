@@ -36,8 +36,6 @@ class Importer:
 
         self.status = ImportStatus()
 
-        self.import_queue: queue.Queue = queue.Queue()
-
     def cancel_workers(self):
         log.workers_cancel()
         self.status.cancel_token.cancel()
@@ -49,7 +47,13 @@ class Importer:
         except ConnectError:
             return False
 
-    async def run_import_loop(self, run_once: bool = False, modified_after: Optional[datetime] = None, modified_before: Optional[datetime] = None):
+    async def run_import_loop(
+        self,
+        run_once: bool = False,
+        modified_after: Optional[datetime] = None,
+        modified_before: Optional[datetime] = None,
+        filesystem: FileSystem = FileSystem(),
+    ):
         cancel_message = "Import cancelled. Exiting import loop."
 
         import_modified_after = await get_updated_modified_after(modified_after=modified_after)
@@ -66,12 +70,19 @@ class Importer:
             if import_modified_after and utils.get_next_full_hour(import_modified_after) > utils.get_now():
                 await wait_for_next_import()
             else:
-                import_modified_after = await self.run_bulk_import(modified_after=import_modified_after, modified_before=modified_before)
+                import_modified_after = await self.run_bulk_import(
+                    modified_after=import_modified_after, modified_before=modified_before, filesystem=filesystem
+                )
 
                 if run_once:
                     break
 
-    async def run_bulk_import(self, modified_after: Optional[datetime] = None, modified_before: Optional[datetime] = None) -> datetime:
+    async def run_bulk_import(
+        self,
+        modified_after: Optional[datetime] = None,
+        modified_before: Optional[datetime] = None,
+        filesystem: FileSystem = FileSystem(),
+    ) -> datetime:
         start = utils.get_now()
         log.bulk_import_start_time(start)
         log.bulk_import_start(modified_after, modified_before)
@@ -90,7 +101,6 @@ class Importer:
         queue_items = FromCollectionFileDB.to_queue_items(gdrive_files, collection_files, self.config.temp_download_folder, self.status.cancel_token)
 
         log.download_folder_create(self.config.temp_download_folder)
-        filesystem = FileSystem()
         filesystem.mkdir(self.config.temp_download_folder, create_parents=True, exist_ok=True)
 
         log.downloads_imports_count(queue_items)
@@ -115,18 +125,16 @@ class Importer:
                 await update_database(CollectionFileChange(collection_file_id=queue_item.collection_file_id, error=True), queue_item.item_no)
                 continue
 
-            await update_database(
-                CollectionFileChange(collection_file_id=queue_item.collection_file_id, downloaded_at=queue_item.status.downloaded_at, error=False),
-                queue_item.item_no,
-            )
-
             await import_worker.process_queue_item(queue_item, self.fleet_data_client, self.config.keep_downloaded_files, filesystem=filesystem)
 
             if queue_item.status.import_error:
-                await update_database(CollectionFileChange(collection_file_id=queue_item.collection_file_id, error=True), queue_item.item_no)
+                await update_database(
+                    CollectionFileChange(collection_file_id=queue_item.collection_file_id, imported=False, error=True),
+                    queue_item.item_no,
+                )
             else:
                 await update_database(
-                    CollectionFileChange(collection_file_id=queue_item.collection_file_id, imported_at=utils.get_now(), error=False),
+                    CollectionFileChange(collection_file_id=queue_item.collection_file_id, imported=True, error=False),
                     queue_item.item_no,
                 )
 
@@ -251,10 +259,10 @@ async def update_database(change: CollectionFileChange, item_no: int):
     async with DatabaseRepository.get_session() as session:
         collection_file = await crud.get_collection_file(session, change.collection_file_id)
 
-        collection_file.downloaded_at = change.downloaded_at or collection_file.downloaded_at
-        collection_file.imported_at = change.imported_at or collection_file.imported_at
+        if change.imported is not None:
+            collection_file.imported = change.imported
         if change.error is not None:
             collection_file.error = change.error
 
         collection_file = await crud.save_collection_file(session, collection_file)
-    # log.queue_item_update(item_no, change)
+    log.queue_item_update(item_no, change)

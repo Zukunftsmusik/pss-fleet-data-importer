@@ -39,7 +39,7 @@ def test_raised_error_caught(
     def mock_gdrive_client_get_file_contents(*args):
         raise google_api_errors[exception_type]
 
-    monkeypatch.setattr(FakeGoogleDriveClient, FakeGoogleDriveClient.get_file_contents.__name__, mock_gdrive_client_get_file_contents)
+    monkeypatch.setattr(fake_gdrive_file, FakeGDriveFile.get_content_string.__name__, mock_gdrive_client_get_file_contents)
 
     item_no = 1337
 
@@ -76,7 +76,7 @@ def test_raised_error_not_caught(
     def mock_gdrive_client_get_file_contents(*args):
         raise exception_type()
 
-    monkeypatch.setattr(FakeGoogleDriveClient, FakeGoogleDriveClient.get_file_contents.__name__, mock_gdrive_client_get_file_contents)
+    monkeypatch.setattr(fake_gdrive_file, FakeGDriveFile.get_content_string.__name__, mock_gdrive_client_get_file_contents)
 
     item_no = 1337
 
