@@ -18,6 +18,7 @@ class GDriveFile:
         self.id: str = google_drive_file["id"]
         self.name: str = get_gdrive_file_name(google_drive_file)
         self.size: int = int(google_drive_file["fileSize"])
+        self.md5_checksum: str = google_drive_file["md5Checksum"]
         self.modified_date: datetime = dateutil.parser.parse(google_drive_file["modifiedDate"])
         self.__google_drive_file: GoogleDriveFile = google_drive_file
 
