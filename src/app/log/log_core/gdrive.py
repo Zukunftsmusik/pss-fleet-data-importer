@@ -1,5 +1,6 @@
 from contextlib import contextmanager
 from pathlib import Path
+from time import perf_counter
 from typing import Union
 
 from .. import LOGGER_BASE
@@ -23,8 +24,9 @@ def credentials_json_exists(file_path: Union[Path, str]):
 @contextmanager
 def download_file(file_name: str):
     LOGGER.debug("Downloading file: %s", file_name)
+    start = perf_counter()
     yield
-    LOGGER.debug("Downloaded file: %s", file_name)
+    LOGGER.debug("Downloaded file in %.2f seconds: %s", (perf_counter() - start), file_name)
 
 
 def download_file_error(file_name: str, exception: Exception):
