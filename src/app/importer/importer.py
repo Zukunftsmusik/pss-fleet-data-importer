@@ -249,11 +249,6 @@ async def wait_for_item_download(queue_item: QueueItem):
         await asyncio.sleep(0.1)
 
 
-async def wait_for_item_import(queue_item: QueueItem):
-    while not queue_item.status.imported and not queue_item.status.import_error:
-        await asyncio.sleep(0.1)
-
-
 async def wait_for_next_import():
     now = utils.get_now()
     wait_until = utils.get_next_full_hour(now) + timedelta(minutes=1)

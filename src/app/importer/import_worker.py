@@ -1,3 +1,5 @@
+import asyncio
+
 from pss_fleet_data import PssFleetDataClient
 from pss_fleet_data.core.exceptions import ApiError, NonUniqueTimestampError
 
@@ -10,23 +12,25 @@ async def process_queue_item(
     queue_item: QueueItem,
     fleet_data_client: PssFleetDataClient,
     keep_downloaded_files: bool,
+    import_attempts: int = 2,
     filesystem: FileSystem = FileSystem(),
 ):
     if skip_file_import_on_error(queue_item, filesystem=filesystem):
         log.skip_file_error(queue_item.item_no, queue_item.gdrive_file.name)
     else:
         log.import_start(queue_item.item_no, queue_item.target_file_path)
-        await do_import(fleet_data_client, queue_item, keep_downloaded_files, filesystem=filesystem)
+        await do_import(fleet_data_client, queue_item, keep_downloaded_files, import_attempts=import_attempts, filesystem=filesystem)
 
 
 async def do_import(
     fleet_data_client: PssFleetDataClient,
     queue_item: QueueItem,
     keep_downloaded_files: bool,
+    import_attempts: int = 2,
     filesystem: FileSystem = FileSystem(),
 ):
     try:
-        await import_file(fleet_data_client, queue_item)
+        await import_file(fleet_data_client, queue_item, import_attempts=import_attempts)
     except ApiError as exc:
         log.file_import_api_error(queue_item.item_no, queue_item.gdrive_file.name, exc)
         queue_item.status.import_error.value = True
@@ -37,12 +41,25 @@ async def do_import(
             filesystem.delete(queue_item.target_file_path, missing_ok=True)
 
 
-async def import_file(fleet_data_client: PssFleetDataClient, queue_item: QueueItem):
-    try:
-        collection_metadata = await fleet_data_client.upload_collection(queue_item.target_file_path)
-        log.file_import_completed(queue_item.item_no, queue_item.target_file_path, collection_metadata.collection_id)
-    except NonUniqueTimestampError:
-        log.file_import_skipped(queue_item.item_no, queue_item.target_file_path)
+async def import_file(fleet_data_client: PssFleetDataClient, queue_item: QueueItem, import_attempts: int = 2):
+    import_error: Exception = None
+
+    for attempt in range(import_attempts):
+        try:
+            collection_metadata = await fleet_data_client.upload_collection(queue_item.target_file_path)
+        except NonUniqueTimestampError:
+            log.file_import_skipped(queue_item.item_no, queue_item.target_file_path)
+            return
+        except Exception as exc:
+            import_error = exc
+            log.file_import_error(queue_item.item_no, queue_item.target_file_path)
+        else:
+            log.file_import_completed(queue_item.item_no, queue_item.target_file_path, collection_metadata.collection_id)
+            return
+
+        await asyncio.sleep(2 ^ attempt)
+
+    raise import_error
 
 
 def skip_file_import_on_error(queue_item: QueueItem, filesystem: FileSystem = FileSystem()) -> bool:

@@ -10,6 +10,10 @@ LOGGER = LOGGER_IMPORTER.getChild("importWorker")
 WORKER_NAME = "Import"
 
 
+def file_import_error(item_no: int, gdrive_file_name: str, exception: Exception):
+    LOGGER.error("%s - Could not import file no. %i: %s", exception, item_no, gdrive_file_name)
+
+
 def file_import_api_error(item_no: int, gdrive_file_name: str, exception: Exception):
     LOGGER.error("Could not import file no. %i: %s", item_no, gdrive_file_name)
     LOGGER.error(exception, exc_info=True)
