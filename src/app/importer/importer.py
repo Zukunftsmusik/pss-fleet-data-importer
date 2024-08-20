@@ -215,6 +215,7 @@ def get_gdrive_file_list(
     with log.download_gdrive_file_list_duration():
         gdrive_files = list(gdrive_client.list_files_by_modified_date(modified_after, modified_before))
 
+    gdrive_files = sorted(gdrive_files, key=lambda gdrive_file: gdrive_file.name.replace("-", "_"))
     return gdrive_files
 
 
