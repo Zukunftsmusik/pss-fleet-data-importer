@@ -63,9 +63,9 @@ class Importer:
                 break
 
             if import_modified_after and modified_before and import_modified_after >= modified_before:
-                import_modified_after = modified_before
-                modified_before = None
-                # break
+                # import_modified_after = modified_before
+                # modified_before = None
+                break
 
             if import_modified_after and utils.get_next_full_hour(import_modified_after) > utils.get_now():
                 await wait_for_next_import()
@@ -73,6 +73,7 @@ class Importer:
                 import_modified_after = await self.run_bulk_import(
                     modified_after=import_modified_after, modified_before=modified_before, filesystem=filesystem
                 )
+                import_modified_after = utils.get_next_full_hour(import_modified_after)
 
                 if run_once:
                     break
@@ -144,13 +145,7 @@ class Importer:
         log.bulk_import_finish(queue_items, modified_after, modified_before)
         log.bulk_import_finish_time(len(queue_items), start, end)
 
-        last_imported_file_modified_date = None
-        for queue_item in queue_items:
-            if not queue_item.status.imported:
-                break
-
-            last_imported_file_modified_date = queue_item.gdrive_file.modified_date
-
+        last_imported_file_modified_date = max((queue_item.gdrive_file.modified_date for queue_item in queue_items if queue_item.status.done))
         return last_imported_file_modified_date
 
 
@@ -166,7 +161,7 @@ async def get_updated_modified_after(modified_after: Optional[datetime] = None):
         else:
             updated_modified_after = latest_imported_modified_date
 
-        return updated_modified_after
+        return utils.get_next_full_hour(updated_modified_after)
 
     return modified_after
 
