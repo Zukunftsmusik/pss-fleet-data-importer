@@ -23,6 +23,10 @@ class QueueItemStatus:
         self.cancel_token = cancel_token
 
     @property
+    def done(self) -> bool:
+        return self.imported.value or self.import_error.value or self.download_error.value
+
+    @property
     def downloaded_at(self) -> Optional[datetime]:
         with self.__downloaded_at_lock:
             return self.__downloaded_at
