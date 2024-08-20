@@ -21,7 +21,25 @@ from src.app.importer.importer import Importer
 
 @dataclass(frozen=False)
 class FakeConfig(ConfigBase):
-    pass
+    def __init__(self, db_async_connection_str: Optional[str] = None, db_sync_connection_str: Optional[str] = None):
+        self.__db_async_connection_str = db_async_connection_str
+        self.__db_sync_connection_str = db_sync_connection_str
+
+    @property
+    def db_async_connection_str(self) -> str:
+        return self.__db_async_connection_str or super().db_async_connection_str
+
+    @db_async_connection_str.setter
+    def db_async_connection_str(self, value: str):
+        self.__db_async_connection_str = value
+
+    @property
+    def db_sync_connection_str(self) -> str:
+        return self.__db_sync_connection_str or super().db_sync_connection_str
+
+    @db_sync_connection_str.setter
+    def db_sync_connection_str(self, value: str):
+        self.__db_sync_connection_str = value
 
 
 class FakeGDriveFile:
@@ -177,12 +195,14 @@ class FakeUnitOfWork(AbstractUnitOfWork):
         collection_files: list[CollectionFileDB] = self.collection_files._collection_files
         for collection_file in collection_files:
             if collection_file.collection_file_id is None:
-                collection_file.collection_file_id = (
-                    max(
-                        (collection_file.collection_file_id for collection_file in collection_files if collection_file.collection_file_id is not None)
-                    )
-                    + 1
-                )
+                collection_file_ids = [
+                    collection_file.collection_file_id for collection_file in collection_files if collection_file.collection_file_id is not None
+                ]
+                if collection_file_ids:
+                    collection_file.collection_file_id = max(collection_file_ids) + 1
+                else:
+                    collection_file.collection_file_id = 1
+
         self.committed = True
 
     async def rollback(self):
@@ -206,11 +226,23 @@ def create_fake_gdrive_file(
     file_name: Optional[str] = None,
     modified_date: Optional[datetime] = None,
     get_content_exception: Exception = None,
+    modified_date_after: Optional[datetime] = None,
+    modified_date_before: Optional[datetime] = None,
 ):
     if modified_date:
         timestamp = modified_date.replace(second=0)
     else:
-        timestamp = datetime.fromordinal(random.randint(737342, 739129)).replace(hour=23, minute=59)
+        if modified_date_after:
+            timestamp_ordinal_from = modified_date_after.toordinal() + 1
+        else:
+            timestamp_ordinal_from = 737342
+
+        if modified_date_before:
+            timestamp_ordinal_to = modified_date_before.toordinal() - 1
+        else:
+            timestamp_ordinal_to = 739129
+
+        timestamp = datetime.fromordinal(random.randint(timestamp_ordinal_from, timestamp_ordinal_to)).replace(hour=23, minute=59)
 
     file_id = file_id or str(uuid.uuid4())
     file_name = file_name or timestamp.strftime("pss-top-100_%Y%m%d-%H%M%S.json")

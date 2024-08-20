@@ -95,7 +95,7 @@ class Importer:
             return modified_after
 
         collection_files = create_collection_files(gdrive_files)
-        await insert_new_collection_files(collection_files)
+        collection_files = await insert_new_collection_files(collection_files)
 
         log.queue_items_create()
         queue_items = FromCollectionFileDB.to_queue_items(gdrive_files, collection_files, self.config.temp_download_folder, self.status.cancel_token)
@@ -268,12 +268,13 @@ async def update_database(change: CollectionFileChange, item_no: int, uow: Optio
     async with uow:
         collection_file = await uow.collection_files.get_by_id(change.collection_file_id)
 
-        if change.imported is not None:
-            collection_file.imported = change.imported
-        if change.error is not None:
-            collection_file.error = change.error
+        if collection_file:
+            if change.imported is not None:
+                collection_file.imported = change.imported
+            if change.error is not None:
+                collection_file.error = change.error
 
-        collection_file = uow.collection_files.add(collection_file)
-        await uow.commit()
+            collection_file = uow.collection_files.add(collection_file)
+            await uow.commit()
 
-        log.queue_item_update(item_no, change)
+            log.queue_item_update(item_no, change)

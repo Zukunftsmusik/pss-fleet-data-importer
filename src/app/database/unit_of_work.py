@@ -18,7 +18,7 @@ class AbstractUnitOfWork(abc.ABC):
     async def __aexit__(self, exc_type, exception, _):
         if exception and exc_type is DBAPIError:
             log.transaction_error(exception)
-        await self.rollback()
+            await self.rollback()
 
     @abc.abstractmethod
     async def commit(self):
@@ -29,12 +29,9 @@ class AbstractUnitOfWork(abc.ABC):
         raise NotImplementedError
 
 
-DEFAULT_SESSION_FACTORY = DatabaseRepository.get_db().async_scoped_session
-
-
 class SqlModelUnitOfWork(AbstractUnitOfWork):
-    def __init__(self, session_factory=DEFAULT_SESSION_FACTORY):
-        self.session_factory: async_scoped_session[AsyncSession] = session_factory
+    def __init__(self, session_factory=None):
+        self.session_factory: async_scoped_session[AsyncSession] = session_factory or DatabaseRepository.get_db().async_scoped_session
 
     async def __aenter__(self):
         async with self.session_factory() as self.session:

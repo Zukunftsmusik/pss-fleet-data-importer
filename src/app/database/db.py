@@ -72,13 +72,13 @@ class Database:
         echo: Optional[bool] = None,
         reinitialize: Optional[bool] = False,
     ):
-        """Initializes the database. Optionally drops all tables before creating them. Optionally dummy data will be read from disk and inserted.
+        """Initializes the database. Optionally drops all tables before creating them.
 
         Args:
             sync_connection_string (str, optional): The connections string for `synchronous` connection to the database. Defaults to `self.sync_connection_string`.
             async_connection_string (str, optional): The connections string for an `asynchronous` connection to the database. Defaults to `self.async_connection_string`.
             echo (bool, optional): Determines, if SQL statements should be logged to `stdout`. Defaults to `self.echo`.
-            drop_tables (bool, optional): Determines, if all tables should be dropped before being recreated. Defaults to False.
+            reinitialize (bool, optional): Determines, if all tables should be dropped before being recreated. Defaults to False.
         """
         sync_connection_string = sync_connection_string or self.sync_connection_string
         async_connection_string = async_connection_string or self.async_connection_string

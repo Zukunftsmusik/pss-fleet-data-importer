@@ -1,7 +1,8 @@
+from unittest import mock
+
 import pytest
 
-from src.app.core import config
-from tests.fake_classes import FakeFileSystem, FakeGoogleDriveClient, FakeImporter, FakePssFleetDataClient
+from tests.fake_classes import FakeConfig, FakeFileSystem, FakeGoogleDriveClient, FakeImporter, FakePssFleetDataClient, FakeUnitOfWork
 
 
 @pytest.fixture(scope="function")
@@ -11,9 +12,16 @@ def fake_fleet_data_client() -> FakePssFleetDataClient:
 
 @pytest.fixture(scope="function")
 def fake_importer(
-    configuration: config.Config,
+    fake_config: FakeConfig,
     fake_gdrive_client: FakeGoogleDriveClient,
     fake_fleet_data_client: FakePssFleetDataClient,
     filesystem: FakeFileSystem,
 ) -> FakeImporter:
-    return FakeImporter(configuration, fake_gdrive_client, fake_fleet_data_client, filesystem=filesystem)
+
+    return FakeImporter(fake_config, fake_gdrive_client, fake_fleet_data_client, filesystem=filesystem)
+
+
+@pytest.fixture(scope="function")
+def patch_unit_of_work_use_fake():
+    with mock.patch("src.app.importer.importer.SqlModelUnitOfWork", new=FakeUnitOfWork):
+        yield

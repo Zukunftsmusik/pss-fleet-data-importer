@@ -12,6 +12,10 @@ class DatabaseRepository:
     __database: Database = None
 
     @classmethod
+    def clear_db(cls):
+        cls.__database = None
+
+    @classmethod
     def get_db(cls) -> Database:
         if not cls.__database:
             configuration = config.ConfigRepository.get_config()

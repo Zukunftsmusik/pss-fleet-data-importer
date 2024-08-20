@@ -13,7 +13,7 @@ class ConfigBase:
     pss_start_date: datetime = datetime(2016, 1, 6, tzinfo=timezone.utc)
     earliest_data_date: datetime = datetime(2019, 10, 10, tzinfo=timezone.utc)
     temp_download_folder: Path = Path("./downloads")
-    download_thread_pool_size: int = int(os.getenv("FLEET_DATA_IMPORTER_WORKER_COUNT", 2))
+    download_thread_pool_size: int = int(os.getenv("FLEET_DATA_IMPORTER_WORKER_COUNT", 3))
     log_folder: Optional[str] = os.getenv("LOG_FOLDER_PATH")
     log_level: Optional[str] = os.getenv("LOG_LEVEL")
 

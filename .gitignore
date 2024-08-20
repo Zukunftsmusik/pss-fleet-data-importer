@@ -1,3 +1,6 @@
+# Pytest database
+pytest.sqlite
+
 # env files
 .env
 .docker-env

@@ -7,19 +7,24 @@ import uuid
 from datetime import datetime
 from hashlib import md5
 from queue import Queue
+from typing import Generator
 
 import googleapiclient.errors
 import pydrive2.files
 import pytest
 from pydrive2.files import GoogleDriveFile
+from pytest_mock import MockerFixture
+from sqlalchemy.ext.asyncio import AsyncEngine, async_sessionmaker, create_async_engine
+from sqlmodel.ext.asyncio.session import AsyncSession
 
-from src.app.core import config
+from src.app.core.config import ConfigRepository
 from src.app.core.gdrive import GDriveFile
 from src.app.core.models.status import StatusFlag
-from src.app.database.models import CollectionFileDB
+from src.app.database.db_repository import DatabaseRepository
+from src.app.database.models import *  # noqa: F403, F401
 from src.app.models import CancellationToken
 from src.app.models.queue_item import QueueItem
-from tests.fake_classes import FakeFileSystem, FakeGDriveFile, FakeGoogleDriveClient, FakePssFleetDataClient
+from tests.fake_classes import FakeConfig, FakeFileSystem, FakeGDriveFile, FakeGoogleDriveClient, FakePssFleetDataClient
 
 
 class MockHttpResponse:
@@ -73,8 +78,9 @@ def google_api_errors(api_request_error: pydrive2.files.ApiRequestError) -> dict
 
 
 @pytest.fixture(scope="function")
-def configuration() -> config.Config:
-    return config.ConfigRepository.get_config()
+def fake_config(sqlite_file_name: str) -> FakeConfig:
+    config = FakeConfig(f"sqlite+aiosqlite:///{sqlite_file_name}", f"sqlite:///{sqlite_file_name}")
+    return config
 
 
 @pytest.fixture(scope="function")
@@ -205,3 +211,45 @@ def fake_queue_item(fake_gdrive_file: FakeGDriveFile, collection_file_db: Collec
 @pytest.fixture(scope="function")
 def fake_pss_fleet_data_client() -> FakePssFleetDataClient:
     return FakePssFleetDataClient()
+
+
+@pytest.fixture(scope="function")
+def sqlite_file_name() -> str:
+    return "pytest.sqlite"
+
+
+@pytest.fixture(scope="function")
+def create_sqlite_file(sqlite_file_name: str) -> AsyncEngine:
+    async_engine = create_async_engine(f"sqlite+aiosqlite:///{sqlite_file_name}")
+    SQLModel.metadata.create_all()
+    return async_engine
+
+
+@pytest.fixture(scope="function")
+def session_factory(create_sqlite_file: AsyncEngine) -> Generator[async_sessionmaker[AsyncSession], None, None]:
+    yield async_sessionmaker(bind=create_sqlite_file, class_=AsyncSession)
+
+
+@pytest.fixture(scope="function")
+def session(session_factory: async_sessionmaker[AsyncSession]):
+    return session_factory()
+
+
+@pytest.fixture(scope="function")
+def patch_get_config_return_fake(fake_config: FakeConfig, monkeypatch: pytest.MonkeyPatch):
+    def get_fake_config():
+        return fake_config
+
+    monkeypatch.setattr(ConfigRepository, ConfigRepository.get_config.__name__, get_fake_config)
+
+
+@pytest.fixture(scope="function")
+def patch_sleep(mocker: MockerFixture):
+    mocker.patch(f"asyncio.sleep")
+    mocker.patch(f"time.sleep")
+
+
+@pytest.fixture(scope="function")
+def reset_database_after_test():
+    yield
+    DatabaseRepository.clear_db()
