@@ -37,7 +37,7 @@ jobs:
           
       - name: Test with pytest
         run: |
-          pytest -x --cov=./src/api --cov-report=xml
+          pytest -x --cov=./src/app --cov-report=xml
 
       - name: Upload coverage reports to Codecov
         uses: codecov/codecov-action@v4
