@@ -1,3 +1,22 @@
+# Pytest database
+pytest.sqlite
+
+# env files
+.env
+.docker-env
+
+# coverage file
+cov.xml
+.coverage
+
+# log file folder
+logs/
+
+# Google Drive Auth
+client_secrets.json
+credentials.json
+settings.yaml
+
 # VS Code
 .vscode/*
 !.vscode/settings.json

@@ -1,0 +1,22 @@
+from datetime import datetime
+
+from sqlmodel import Field, SQLModel
+
+from ..core.models import CollectionFileBase
+
+
+class CollectionFileDB(SQLModel, CollectionFileBase, table=True):
+    __tablename__ = "collection_file"
+
+    collection_file_id: int = Field(primary_key=True, index=True, default=None, sa_column_kwargs={"name": "id"})
+    gdrive_file_id: str = Field(index=True, unique=True)
+    file_name: str = Field(index=True, unique=True)
+    gdrive_modified_date: datetime = Field(index=True)
+    timestamp: datetime = Field(index=True, unique=True)
+    imported: bool = Field(default=False)
+    error: bool = Field(default=False)
+
+
+__all__ = [
+    CollectionFileDB.__name__,
+]
