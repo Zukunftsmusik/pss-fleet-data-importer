@@ -43,7 +43,7 @@ async def test_log_raised_api_error_and_return(
     monkeypatch: pytest.MonkeyPatch,
     caplog: pytest.LogCaptureFixture,
 ):
-    async def mock_import_file_returns_timestamp(fleet_data_client, inner_queue_item):
+    async def mock_import_file_returns_timestamp(fleet_data_client, inner_queue_item, import_attempts=2):
         raise api_error
 
     monkeypatch.setattr(import_worker, import_worker.import_file.__name__, mock_import_file_returns_timestamp)
