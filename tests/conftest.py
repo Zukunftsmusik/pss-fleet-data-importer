@@ -1,5 +1,6 @@
 import asyncio
 import logging
+import os
 import random
 import string
 import time
@@ -250,6 +251,7 @@ def patch_sleep(mocker: MockerFixture):
 
 
 @pytest.fixture(scope="function")
-def reset_database_after_test():
+def reset_database_after_test(sqlite_file_name: str):
     yield
     DatabaseRepository.clear_db()
+    os.remove(sqlite_file_name)
