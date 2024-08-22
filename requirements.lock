@@ -43,7 +43,7 @@ frozenlist==1.4.1
     # via aiosignal
 google-api-core==2.19.1
     # via google-api-python-client
-google-api-python-client==2.141.0
+google-api-python-client==2.142.0
     # via pydrive2
 google-auth==2.34.0
     # via google-api-core
@@ -85,7 +85,7 @@ protobuf==5.27.3
     # via google-api-core
     # via googleapis-common-protos
     # via proto-plus
-pss-fleet-data-client==0.4.0
+pss-fleet-data-client==0.4.1
 pssapi==0.5.1
     # via pss-fleet-data-client
 psycopg2-binary==2.9.9
