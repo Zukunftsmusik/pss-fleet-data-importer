@@ -3,7 +3,7 @@ from datetime import datetime
 import pytest
 from pydrive2.files import ApiRequestError
 
-from fake_classes import FakeImporter, create_fake_gdrive_file
+from fake_classes import FakeImporter, create_fake_gdrive_files
 from src.app.database.unit_of_work import SqlModelUnitOfWork
 from src.app.importer.importer import create_collection_files
 
@@ -11,8 +11,8 @@ from src.app.importer.importer import create_collection_files
 @pytest.mark.usefixtures("patch_get_config_return_fake", "reset_database_after_test")
 async def test_happy_path_fresh_database(fake_importer: FakeImporter):
     create_n_files = 10
-    for _ in range(create_n_files):
-        fake_importer.gdrive_client.files.append(create_fake_gdrive_file())
+    for gdrive_file in create_fake_gdrive_files(create_n_files):
+        fake_importer.gdrive_client.files.append(gdrive_file)
 
     await fake_importer.run_bulk_import()
 
@@ -30,8 +30,8 @@ async def test_happy_path_with_files_already_imported(fake_importer: FakeImporte
     create_n_new_files = 5
     modified_date = datetime(2023, 1, 1)
 
-    old_fake_gdrive_files = [create_fake_gdrive_file(modified_date_before=modified_date) for _ in range(create_n_old_files)]
-    new_fake_gdrive_files = [create_fake_gdrive_file(modified_date_after=modified_date) for _ in range(create_n_new_files)]
+    old_fake_gdrive_files = create_fake_gdrive_files(create_n_old_files, modified_date_before=modified_date)
+    new_fake_gdrive_files = create_fake_gdrive_files(create_n_new_files, modified_date_after=modified_date)
 
     fake_importer.gdrive_client.files = old_fake_gdrive_files + new_fake_gdrive_files
 
@@ -59,8 +59,8 @@ async def test_happy_path_with_files_uploaded_after_first_import(fake_importer: 
     create_n_new_files = 5
     modified_date = datetime(2023, 1, 1)
 
-    old_fake_gdrive_files = [create_fake_gdrive_file(modified_date_before=modified_date) for _ in range(create_n_old_files)]
-    new_fake_gdrive_files = [create_fake_gdrive_file(modified_date_after=modified_date) for _ in range(create_n_new_files)]
+    old_fake_gdrive_files = create_fake_gdrive_files(create_n_old_files, modified_date_before=modified_date)
+    new_fake_gdrive_files = create_fake_gdrive_files(create_n_new_files, modified_date_after=modified_date)
 
     fake_importer.gdrive_client.files = old_fake_gdrive_files
 
@@ -90,8 +90,8 @@ async def test_happy_path_with_files_not_downloaded_from_gdrive(fake_importer: F
     create_n_ok_files = 8
     create_n_broken_files = 2
 
-    ok_fake_gdrive_files = [create_fake_gdrive_file() for _ in range(create_n_ok_files)]
-    broken_fake_gdrive_files = [create_fake_gdrive_file(get_content_exception=api_request_error) for _ in range(create_n_broken_files)]
+    ok_fake_gdrive_files = create_fake_gdrive_files(create_n_ok_files)
+    broken_fake_gdrive_files = create_fake_gdrive_files(create_n_broken_files, get_content_exception=api_request_error)
 
     fake_importer.gdrive_client.files = ok_fake_gdrive_files + broken_fake_gdrive_files
 
