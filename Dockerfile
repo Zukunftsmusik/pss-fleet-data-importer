@@ -11,7 +11,8 @@ COPY alembic.ini main.py ./
 # Create empty secrets and settings files, if they don't exist, so the subsequent COPY doesn't fail.
 RUN touch ./client_secrets.json
 RUN touch ./settings.yaml
-COPY client_secrets.json settings.yaml ./
+COPY ./client_secrets.jso[n] ./
+COPY ./settings.yam[l] ./
 
 COPY src ./src
 

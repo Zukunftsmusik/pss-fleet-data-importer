@@ -133,7 +133,6 @@ sqlalchemy==2.0.32
     # via sqlmodel
 sqlalchemy-utils==0.41.2
 sqlmodel==0.0.21
-stopit==1.1.2
 typing-extensions==4.12.2
     # via alembic
     # via pydantic
