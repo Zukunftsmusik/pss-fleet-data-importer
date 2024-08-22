@@ -16,6 +16,7 @@ class ConfigBase:
     download_thread_pool_size: int = int(os.getenv("FLEET_DATA_IMPORTER_WORKER_COUNT", 3))
     log_folder: Optional[str] = os.getenv("LOG_FOLDER_PATH")
     log_level: Optional[str] = os.getenv("LOG_LEVEL")
+    chunk_size: int = int(os.getenv("CHUNK_SIZE", 250))
 
     # PSS Fleet Data API
     api_default_server_url: str = os.getenv("FLEET_DATA_API_URL", "https://fleetdata.dolores2.xyz")

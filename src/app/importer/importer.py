@@ -25,12 +25,10 @@ class Importer:
     def __init__(
         self,
         config: Config,
-        gdrive_client: GoogleDriveClient,
         pss_fleet_data_client: PssFleetDataClient,
         filesystem: FileSystem = FileSystem(),
     ):
         self.config: Config = config
-        self.gdrive_client: GoogleDriveClient = gdrive_client
         self.fleet_data_client: PssFleetDataClient = pss_fleet_data_client
         self.filesystem = filesystem
 
@@ -68,8 +66,24 @@ class Importer:
             if import_modified_after and utils.get_next_full_hour(import_modified_after) > utils.get_now():
                 await wait_for_next_import()
             else:
+                gdrive_client = GoogleDriveClient(
+                    self.config.gdrive_project_id,
+                    self.config.gdrive_private_key_id,
+                    self.config.gdrive_private_key,
+                    self.config.gdrive_client_email,
+                    self.config.gdrive_client_id,
+                    self.config.gdrive_scopes,
+                    self.config.gdrive_folder_id,
+                    self.config.gdrive_service_account_file_path,
+                    self.config.gdrive_settings_file_path,
+                )
+                gdrive_client.initialize()
+
                 import_modified_after = await self.run_bulk_import(
-                    modified_after=import_modified_after, modified_before=modified_before, filesystem=filesystem
+                    gdrive_client,
+                    modified_after=import_modified_after,
+                    modified_before=modified_before,
+                    filesystem=filesystem,
                 )
                 import_modified_after = utils.get_next_full_hour(import_modified_after)
 
@@ -78,6 +92,7 @@ class Importer:
 
     async def run_bulk_import(
         self,
+        gdrive_client: GoogleDriveClient,
         modified_after: Optional[datetime] = None,
         modified_before: Optional[datetime] = None,
         filesystem: FileSystem = FileSystem(),
@@ -87,9 +102,13 @@ class Importer:
         log.bulk_import_start(modified_after, modified_before)
 
         log.download_gdrive_file_list_params(modified_after=modified_after, modified_before=modified_before)
-        gdrive_files = get_gdrive_file_list(self.gdrive_client, modified_after=modified_after, modified_before=modified_before)
 
-        log.download_gdrive_file_list_length(len(gdrive_files))
+        gdrive_files = get_gdrive_file_list(gdrive_client, modified_after=modified_after, modified_before=modified_before)
+
+        if len(gdrive_files) > self.config.chunk_size:
+            gdrive_files = gdrive_files[: self.config.chunk_size]
+
+        log.download_gdrive_file_list_length(len(gdrive_files), self.config.chunk_size)
         if not gdrive_files:
             return modified_after
 
@@ -106,7 +125,7 @@ class Importer:
 
         download_worker_thread = create_download_worker_thread(
             queue_items,
-            self.gdrive_client,
+            gdrive_client,
             self.config.download_thread_pool_size,
             self.config.debug_mode,
             self.status.cancel_token,
@@ -137,10 +156,6 @@ class Importer:
                     queue_item.item_no,
                 )
 
-            if queue_item.item_no % 30 == 0:
-                # Occasionally reinitialize the gdrive client to make sure that files can be downloaded (Invalid client secrets file Invalid file format.)
-                self.reinitialize_gdrive_client()
-
         download_worker_thread.join()
 
         end = utils.get_now()
@@ -149,9 +164,6 @@ class Importer:
 
         last_imported_file_modified_date = max((queue_item.gdrive_file.modified_date for queue_item in queue_items if queue_item.status.done))
         return last_imported_file_modified_date
-
-    def reinitialize_gdrive_client(self, filesystem: FileSystem = FileSystem()):
-        self.gdrive_client.initialize(filesystem=filesystem)
 
 
 async def get_updated_modified_after(modified_after: Optional[datetime] = None):

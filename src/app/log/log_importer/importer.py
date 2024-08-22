@@ -76,9 +76,11 @@ def download_gdrive_file_list_duration():
     LOGGER.debug("%s took %.2f seconds", "Downloading file list", end - start)
 
 
-def download_gdrive_file_list_length(gdrive_files_count: int):
+def download_gdrive_file_list_length(gdrive_files_count: int, chunk_size: int):
     if gdrive_files_count == 0:
         LOGGER.info("No new files found to be imported.")
+    elif gdrive_files_count > chunk_size:
+        LOGGER.info("Found %i new gdrive files to be imported. Working with chunk of %i.", gdrive_files_count, chunk_size)
     else:
         LOGGER.info("Found %i new gdrive files to be imported.", gdrive_files_count)
 

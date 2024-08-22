@@ -145,7 +145,6 @@ class FakeFileSystem:
 
 class FakeImporter(Importer):
     config: FakeConfig
-    gdrive_client: FakeGoogleDriveClient
     pss_fleet_data_client: FakePssFleetDataClient
     filesystem: FakeFileSystem
 

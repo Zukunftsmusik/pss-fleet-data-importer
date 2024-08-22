@@ -47,7 +47,6 @@ async def main():
 
     importer = Importer(
         configuration,
-        gdrive_client,
         pss_fleet_data_client,
     )
 

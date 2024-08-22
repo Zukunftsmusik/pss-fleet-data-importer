@@ -2,7 +2,7 @@ from unittest import mock
 
 import pytest
 
-from tests.fake_classes import FakeConfig, FakeFileSystem, FakeGoogleDriveClient, FakeImporter, FakePssFleetDataClient, FakeUnitOfWork
+from tests.fake_classes import FakeConfig, FakeFileSystem, FakeImporter, FakePssFleetDataClient, FakeUnitOfWork
 
 
 @pytest.fixture(scope="function")
@@ -13,12 +13,11 @@ def fake_fleet_data_client() -> FakePssFleetDataClient:
 @pytest.fixture(scope="function")
 def fake_importer(
     fake_config: FakeConfig,
-    fake_gdrive_client: FakeGoogleDriveClient,
     fake_fleet_data_client: FakePssFleetDataClient,
     filesystem: FakeFileSystem,
 ) -> FakeImporter:
 
-    return FakeImporter(fake_config, fake_gdrive_client, fake_fleet_data_client, filesystem=filesystem)
+    return FakeImporter(fake_config, fake_fleet_data_client, filesystem=filesystem)
 
 
 @pytest.fixture(scope="function")
