@@ -9,10 +9,7 @@ RUN PYTHONDONTWRITEBYTECODE=1 pip install --no-cache-dir -r requirements.lock
 COPY alembic.ini main.py ./
 
 # Create empty secrets and settings files, if they don't exist, so the subsequent COPY doesn't fail.
-RUN touch ./client_secrets.json
-RUN touch ./settings.yaml
-COPY ./client_secrets.jso[n] ./
-COPY ./settings.yam[l] ./
+COPY requirements.lock client_secrets.jso[n] settings.yam[l] ./
 
 COPY src ./src
 
