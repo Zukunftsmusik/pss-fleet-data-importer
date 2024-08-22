@@ -139,6 +139,10 @@ class Importer:
                     queue_item.item_no,
                 )
 
+            if queue_item.item_no % 30 == 0:
+                # Occasionally reinitialize the gdrive client to make sure that files can be downloaded (Invalid client secrets file Invalid file format.)
+                self.reinitialize_gdrive_client()
+
         download_worker_thread.join()
 
         end = utils.get_now()
@@ -147,6 +151,9 @@ class Importer:
 
         last_imported_file_modified_date = max((queue_item.gdrive_file.modified_date for queue_item in queue_items if queue_item.status.done))
         return last_imported_file_modified_date
+
+    def reinitialize_gdrive_client(self, filesystem: FileSystem = FileSystem()):
+        self.gdrive_client.initialize(filesystem=filesystem)
 
 
 async def get_updated_modified_after(modified_after: Optional[datetime] = None):
