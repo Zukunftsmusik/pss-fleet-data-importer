@@ -221,32 +221,34 @@ def create_fake_collection_file(collection_file_id: Optional[int] = None, gdrive
     )
 
 
+def create_fake_collection_files(gdrive_files: list[Union[GDriveFile, FakeGDriveFile]], create_collection_file_ids: bool = False):
+    if create_collection_file_ids:
+        result = [create_fake_collection_file(collection_file_id=i, gdrive_file=gdrive_file) for i, gdrive_file in enumerate(gdrive_files, 1)]
+    else:
+        result = [create_fake_collection_file(gdrive_file) for gdrive_file in gdrive_files]
+    return result
+
+
 def create_fake_gdrive_file(
-    file_id: Optional[str] = None,
-    file_name: Optional[str] = None,
-    modified_date: Optional[datetime] = None,
     get_content_exception: Exception = None,
     modified_date_after: Optional[datetime] = None,
     modified_date_before: Optional[datetime] = None,
-):
-    if modified_date:
-        timestamp = modified_date.replace(second=0)
+) -> FakeGDriveFile:
+    if modified_date_after:
+        timestamp_ordinal_from = modified_date_after.toordinal() + 1
     else:
-        if modified_date_after:
-            timestamp_ordinal_from = modified_date_after.toordinal() + 1
-        else:
-            timestamp_ordinal_from = 737342
+        timestamp_ordinal_from = 737342
 
-        if modified_date_before:
-            timestamp_ordinal_to = modified_date_before.toordinal() - 1
-        else:
-            timestamp_ordinal_to = 739129
+    if modified_date_before:
+        timestamp_ordinal_to = modified_date_before.toordinal() - 1
+    else:
+        timestamp_ordinal_to = 739129
 
-        timestamp = datetime.fromordinal(random.randint(timestamp_ordinal_from, timestamp_ordinal_to)).replace(hour=23, minute=59)
+    timestamp = datetime.fromordinal(random.randint(timestamp_ordinal_from, timestamp_ordinal_to)).replace(hour=23, minute=59, second=0)
 
-    file_id = file_id or str(uuid.uuid4())
-    file_name = file_name or timestamp.strftime("pss-top-100_%Y%m%d-%H%M%S.json")
-    modified_date = modified_date or timestamp + timedelta(seconds=30)
+    file_id = str(uuid.uuid4())
+    file_name = timestamp.strftime("pss-top-100_%Y%m%d-%H%M%S.json")
+    modified_date = timestamp + timedelta(seconds=30)
 
     content = json.dumps(
         {
@@ -266,3 +268,22 @@ def create_fake_gdrive_file(
     file_size = len(content)
 
     return FakeGDriveFile(file_id, file_name, file_size, modified_date, content, get_content_exception=get_content_exception)
+
+
+def create_fake_gdrive_files(
+    count: int,
+    get_content_exception: Exception = None,
+    modified_date_after: Optional[datetime] = None,
+    modified_date_before: Optional[datetime] = None,
+) -> list[FakeGDriveFile]:
+    result: list[FakeGDriveFile] = []
+
+    while len(result) < count:
+        gdrive_file = create_fake_gdrive_file(
+            get_content_exception=get_content_exception, modified_date_after=modified_date_after, modified_date_before=modified_date_before
+        )
+
+        if not result or all(file.name != gdrive_file.name for file in result):
+            result.append(gdrive_file)
+
+    return result
