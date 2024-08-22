@@ -1,7 +1,7 @@
 from datetime import datetime
 from typing import Iterable, Optional
 
-from sqlalchemy.sql.operators import is_, or_
+from sqlalchemy.sql.operators import is_
 from sqlmodel import asc, col, desc, select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
@@ -61,11 +61,7 @@ async def list_collection_files(session: AsyncSession, imported: Optional[bool] 
 
 async def get_latest_imported_gdrive_modified_date(session: AsyncSession) -> Optional[datetime]:
     async with session:
-        query = (
-            select(CollectionFileDB)
-            .where(or_(is_(CollectionFileDB.imported, True), is_(CollectionFileDB.error, True)))
-            .order_by(desc(CollectionFileDB.gdrive_modified_date))
-        )
+        query = select(CollectionFileDB).where(is_(CollectionFileDB.imported, True)).order_by(desc(CollectionFileDB.gdrive_modified_date))
         result = await session.exec(query)
         collection_file = result.first()
         if collection_file:
