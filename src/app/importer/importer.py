@@ -63,8 +63,6 @@ class Importer:
                 break
 
             if import_modified_after and modified_before and import_modified_after >= modified_before:
-                # import_modified_after = modified_before
-                # modified_before = None
                 break
 
             if import_modified_after and utils.get_next_full_hour(import_modified_after) > utils.get_now():
