@@ -1,7 +1,7 @@
 from datetime import datetime
 from typing import Iterable, Optional
 
-from sqlalchemy.sql.operators import is_, or_
+from sqlalchemy.sql.operators import is_
 from sqlmodel import asc, col, desc, select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
