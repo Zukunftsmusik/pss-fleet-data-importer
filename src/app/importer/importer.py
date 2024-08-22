@@ -105,10 +105,10 @@ class Importer:
 
         gdrive_files = get_gdrive_file_list(gdrive_client, modified_after=modified_after, modified_before=modified_before)
 
+        log.download_gdrive_file_list_length(len(gdrive_files), self.config.chunk_size)
         if len(gdrive_files) > self.config.chunk_size:
             gdrive_files = gdrive_files[: self.config.chunk_size]
 
-        log.download_gdrive_file_list_length(len(gdrive_files), self.config.chunk_size)
         if not gdrive_files:
             return modified_after
 
