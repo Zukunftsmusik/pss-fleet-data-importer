@@ -11,7 +11,10 @@ WORKER_NAME = "Import"
 
 
 def file_import_error(item_no: int, gdrive_file_name: str, exception: Exception):
-    LOGGER.error("%s - Could not import file no. %i: %s", exception, item_no, gdrive_file_name)
+    if exception.args:
+        LOGGER.warn("Could not import file no. %i: %s - %s (%s)", item_no, gdrive_file_name, type(exception).__qualname__, " - ".join(exception.args))
+    else:
+        LOGGER.warn("Could not import file no. %i: %s - %s", item_no, gdrive_file_name, type(exception).__qualname__)
 
 
 def file_import_api_error(item_no: int, gdrive_file_name: str, exception: Exception):
