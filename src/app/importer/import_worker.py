@@ -52,7 +52,7 @@ async def import_file(fleet_data_client: PssFleetDataClient, queue_item: QueueIt
             return
         except Exception as exc:
             import_error = exc
-            log.file_import_error(queue_item.item_no, queue_item.target_file_path)
+            log.file_import_error(queue_item.item_no, queue_item.target_file_path, exc)
         else:
             log.file_import_completed(queue_item.item_no, queue_item.target_file_path, collection_metadata.collection_id)
             return
