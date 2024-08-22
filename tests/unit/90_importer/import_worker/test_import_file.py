@@ -40,3 +40,29 @@ async def test_return_timestamp_and_log_skip_on_non_unique_timestamp_error(
         await import_file(fake_pss_fleet_data_client, queue_item)
 
     assert "skipped" in caplog.text.lower()
+
+
+@pytest.mark.usefixtures("patch_sleep")
+async def test_log_generic_exception_then_reraise(
+    fake_pss_fleet_data_client: FakePssFleetDataClient,
+    queue_item: QueueItem,
+    monkeypatch: pytest.MonkeyPatch,
+    caplog: pytest.LogCaptureFixture,
+):
+    exception = ValueError()
+
+    queue_item.gdrive_file = create_fake_gdrive_file()
+
+    async def mock_upload_collection_raises_non_unique_timestamp_error(file_path, api_key=None):
+        raise exception
+
+    monkeypatch.setattr(
+        fake_pss_fleet_data_client, FakePssFleetDataClient.upload_collection.__name__, mock_upload_collection_raises_non_unique_timestamp_error
+    )
+
+    with caplog.at_level(logging.WARN):
+        with pytest.raises(ValueError):
+            await import_file(fake_pss_fleet_data_client, queue_item)
+
+    assert "could not import file" in caplog.text.lower()
+    assert type(exception).__qualname__ in caplog.text
