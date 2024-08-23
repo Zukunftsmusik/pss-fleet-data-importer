@@ -145,7 +145,6 @@ class FakeFileSystem:
 
 class FakeImporter(Importer):
     config: FakeConfig
-    gdrive_client: FakeGoogleDriveClient
     pss_fleet_data_client: FakePssFleetDataClient
     filesystem: FakeFileSystem
 
@@ -167,7 +166,7 @@ class FakeCollectionFileRepository(AbstractCollectionFileRepository):
         collection_files = [collection_file for collection_file in self._collection_files if collection_file.imported]
         if collection_files:
             result = sorted(collection_files, key=lambda collection_file: collection_file.gdrive_modified_date, reverse=True)
-            return result[0]
+            return result[0].gdrive_modified_date
         return None
 
     async def list_files(self, imported: Optional[bool] = None, gdrive_file_ids: Optional[list[str]] = None) -> list[CollectionFileDB]:
