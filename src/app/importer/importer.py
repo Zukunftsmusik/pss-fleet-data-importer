@@ -13,7 +13,6 @@ from ..core.gdrive import GDriveFile, GoogleDriveClient
 from ..core.models.cancellation_token import CancellationToken
 from ..core.models.collection_file_change import CollectionFileChange
 from ..core.models.filesystem import FileSystem
-from ..database import DatabaseRepository, crud
 from ..database.models import CollectionFileDB
 from ..database.unit_of_work import AbstractUnitOfWork, SqlModelUnitOfWork
 from ..log.log_importer import importer as log
@@ -166,19 +165,19 @@ class Importer:
         return last_imported_file_modified_date
 
 
-async def get_updated_modified_after(modified_after: Optional[datetime] = None):
-    async with DatabaseRepository.get_session() as session:
-        latest_imported_modified_date = await crud.get_latest_imported_gdrive_modified_date(session)
+async def get_updated_modified_after(modified_after: Optional[datetime] = None, uow: AbstractUnitOfWork = None):
+    uow = uow or SqlModelUnitOfWork()
+
+    async with uow:
+        latest_imported_modified_date = await uow.collection_files.get_latest_imported_gdrive_modified_date()
 
     if latest_imported_modified_date:
         latest_imported_modified_date = utils.get_next_full_hour(latest_imported_modified_date)
 
         if modified_after:
-            updated_modified_after = max(modified_after, latest_imported_modified_date)
-        else:
-            updated_modified_after = latest_imported_modified_date
+            return max(modified_after, latest_imported_modified_date)
 
-        return utils.get_next_full_hour(updated_modified_after)
+        return latest_imported_modified_date
 
     return modified_after
 
