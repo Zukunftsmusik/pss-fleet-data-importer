@@ -24,11 +24,11 @@ def mock_collection_metadata():
 
 
 @pytest.fixture(scope="function")
-def patch_import_file_returns_timestamp(monkeypatch: pytest.MonkeyPatch):
-    async def mock_import_file_returns_timestamp(fleet_data_client, inner_queue_item, import_attempts=2):
+def patch_upload_collection_returns_timestamp(monkeypatch: pytest.MonkeyPatch):
+    async def mock_import_file_returns_timestamp(fleet_data_client, inner_queue_item, import_attempts=2, reraise_non_unique_timestamp_error=False):
         return utils.get_now()
 
-    monkeypatch.setattr(import_worker, import_worker.import_file.__name__, mock_import_file_returns_timestamp)
+    monkeypatch.setattr(import_worker, import_worker.upload_collection.__name__, mock_import_file_returns_timestamp)
 
 
 @pytest.fixture(scope="function")

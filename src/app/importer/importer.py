@@ -142,7 +142,13 @@ class Importer:
                 await update_database(CollectionFileChange(collection_file_id=queue_item.collection_file_id, error=True), queue_item.item_no)
                 continue
 
-            await import_worker.process_queue_item(queue_item, self.fleet_data_client, self.config.keep_downloaded_files, filesystem=filesystem)
+            await import_worker.process_queue_item(
+                queue_item,
+                self.fleet_data_client,
+                self.config.keep_downloaded_files,
+                update_existing_collections=self.config.update_existing_collections,
+                filesystem=filesystem,
+            )
 
             if queue_item.status.import_error:
                 await update_database(

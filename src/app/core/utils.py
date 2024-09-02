@@ -43,7 +43,7 @@ def extract_timestamp_from_gdrive_file_name(file_name: str) -> datetime:
     expected_file_name_lengths = [len(format_string) + 2 for format_string in format_strings]
 
     if len(file_name) not in expected_file_name_lengths:
-        raise ValueError(f"The provided file name is not of any expected length: {expected_file_name_lengths}")
+        raise ValueError(f"The provided file name '{file_name}' is not of any expected length: {expected_file_name_lengths}")
 
     for format_string in format_strings:
         try:
@@ -51,7 +51,7 @@ def extract_timestamp_from_gdrive_file_name(file_name: str) -> datetime:
             return timestamp
         except ValueError:
             pass
-    raise ValueError(f"The provided file name did not match any of the expected formats: {format_strings}")
+    raise ValueError(f"The provided file name '{file_name}' did not match any of the expected formats: {format_strings}")
 
 
 def get_next_full_hour(dt: datetime) -> datetime:

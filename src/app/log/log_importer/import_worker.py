@@ -10,6 +10,14 @@ LOGGER = LOGGER_IMPORTER.getChild("importWorker")
 WORKER_NAME = "Import"
 
 
+def collection_update_skipped(item_no: int, file_path: Union[Path, str]):
+    LOGGER.warn("Skipped file no. %i (timestamps don't match): %s", item_no, file_path)
+
+
+def collection_upload_skipped(item_no: int, file_path: Union[Path, str]):
+    LOGGER.info("Skipped file no. %i (Collection already exists): %s", item_no, file_path)
+
+
 def file_import_error(item_no: int, gdrive_file_name: str, exception: Exception):
     if exception.args:
         LOGGER.warn("Could not import file no. %i: %s - %s (%s)", item_no, gdrive_file_name, type(exception).__qualname__, " - ".join(exception.args))
@@ -24,10 +32,6 @@ def file_import_api_error(item_no: int, gdrive_file_name: str, exception: Except
 
 def file_import_completed(item_no: int, file_path: Union[Path, str], collection_id: int):
     LOGGER.info("Imported file no. %i (Collection ID: %i): %s", item_no, collection_id, file_path)
-
-
-def file_import_skipped(item_no: int, file_path: Union[Path, str]):
-    LOGGER.info("Skipped file no. %i (Collection already exists): %s", item_no, file_path)
 
 
 def import_start(file_no: int, file_path: Union[Path, str]):
@@ -59,9 +63,10 @@ def skip_file_import_empty_json(file_no: int, file_path: Union[Path, str]):
 
 
 __all__ = [
+    collection_update_skipped.__name__,
+    collection_upload_skipped.__name__,
     file_import_api_error.__name__,
     file_import_completed.__name__,
-    file_import_skipped.__name__,
     import_start.__name__,
     import_worker_ended.__name__,
     import_worker_started.__name__,
