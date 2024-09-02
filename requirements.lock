@@ -28,7 +28,7 @@ attrs==24.2.0
 cachetools==5.5.0
     # via google-auth
 cancel-token==0.1.6
-certifi==2024.7.4
+certifi==2024.8.30
     # via httpcore
     # via httpx
     # via requests
@@ -41,9 +41,9 @@ cryptography==43.0.0
 frozenlist==1.4.1
     # via aiohttp
     # via aiosignal
-google-api-core==2.19.1
+google-api-core==2.19.2
     # via google-api-python-client
-google-api-python-client==2.142.0
+google-api-python-client==2.143.0
     # via pydrive2
 google-auth==2.34.0
     # via google-api-core
@@ -51,7 +51,7 @@ google-auth==2.34.0
     # via google-auth-httplib2
 google-auth-httplib2==0.2.0
     # via google-api-python-client
-googleapis-common-protos==1.63.2
+googleapis-common-protos==1.65.0
     # via google-api-core
 greenlet==3.0.3
     # via sqlalchemy
@@ -63,9 +63,9 @@ httplib2==0.22.0
     # via google-api-python-client
     # via google-auth-httplib2
     # via oauth2client
-httpx==0.27.0
+httpx==0.27.2
     # via pss-fleet-data-client
-idna==3.7
+idna==3.8
     # via anyio
     # via httpx
     # via requests
@@ -81,11 +81,11 @@ oauth2client==4.1.3
     # via pydrive2
 proto-plus==1.24.0
     # via google-api-core
-protobuf==5.27.3
+protobuf==5.28.0
     # via google-api-core
     # via googleapis-common-protos
     # via proto-plus
-pss-fleet-data-client==0.4.1
+pss-fleet-data-client==0.5.0
 pssapi==0.5.1
     # via pss-fleet-data-client
 psycopg2-binary==2.9.9
@@ -106,7 +106,7 @@ pydantic-core==2.20.1
 pydrive2==1.20.0
 pyopenssl==24.2.1
     # via pydrive2
-pyparsing==3.1.2
+pyparsing==3.1.4
     # via httplib2
 python-dateutil==2.9.0.post0
     # via pss-fleet-data-client
@@ -132,7 +132,7 @@ sqlalchemy==2.0.32
     # via sqlalchemy-utils
     # via sqlmodel
 sqlalchemy-utils==0.41.2
-sqlmodel==0.0.21
+sqlmodel==0.0.22
 typing-extensions==4.12.2
     # via alembic
     # via pydantic
@@ -146,5 +146,5 @@ urllib3==2.2.2
     # via requests
 websockets==12.0
     # via pssapi
-yarl==1.9.4
+yarl==1.9.7
     # via aiohttp
