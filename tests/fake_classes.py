@@ -8,6 +8,7 @@ from pathlib import Path
 from typing import Generator, Iterable, Optional, Union
 
 import yaml
+from pss_fleet_data.core.exceptions import CollectionNotFoundError, ConflictError
 from pss_fleet_data.models.client_models import CollectionMetadata
 
 from src.app.adapters.repository import AbstractCollectionFileRepository
@@ -83,6 +84,37 @@ class FakePssFleetDataClient:
     async def ping(self) -> str:
         return "Pong!"
 
+    async def get_most_recent_collection_metadata_by_timestamp(self, timestamp: datetime) -> CollectionMetadata:
+        older_collections = [collection for collection in self.collections.values() if collection.timestamp <= timestamp]
+        older_collections = sorted(older_collections, key=lambda collection: collection.timestamp)
+        if older_collections:
+            return CollectionMetadata(**older_collections[-1].model_dump())
+        return None
+
+    async def update_collection(self, collection_id: int, file_path: Union[Path, str], api_key: Optional[str] = None) -> CollectionMetadata:
+        if collection_id not in self.collections:
+            raise CollectionNotFoundError(None, None, None, None, None, [])
+
+        file_name = Path(file_path).name
+        timestamp = utils.extract_timestamp_from_gdrive_file_name(file_name)
+
+        if timestamp != self.collections[collection_id].timestamp:
+            raise ConflictError(None, None, None, None, None, [])
+
+        metadata = CollectionMetadata(
+            collection_id=collection_id,
+            timestamp=timestamp,
+            duration=5.0,
+            fleet_count=1,
+            user_count=1,
+            schema_version=9,
+            tournament_running=False,
+            data_version=9,
+        )
+
+        self.collections[collection_id] = metadata
+        return CollectionMetadata(**metadata.model_dump())
+
     async def upload_collection(self, file_path: Union[Path, str], api_key: Optional[str] = None) -> CollectionMetadata:
         file_name = Path(file_path).name
         collection_id = len(self.collections) + 1
@@ -100,7 +132,7 @@ class FakePssFleetDataClient:
         )
 
         self.collections[collection_id] = metadata
-        return metadata
+        return CollectionMetadata(**metadata.model_dump())
 
 
 class FakeFileSystem:

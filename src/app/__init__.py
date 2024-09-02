@@ -2,7 +2,7 @@ from . import core, database, importer, models
 
 
 __app_name__ = "importer"
-__version__ = "0.2.1"
+__version__ = "0.3.0"
 
 
 __all__ = [

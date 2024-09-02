@@ -38,6 +38,7 @@ class ConfigBase:
     in_github_actions: bool = os.getenv("GITHUB_ACTIONS", "false").lower() == "true"  # True if in github actions
     keep_downloaded_files: bool = os.getenv("KEEP_DOWNLOADED_FILES", "false").lower() == "true"
     reinitialize_database_on_startup: bool = os.getenv("REINITIALIZE_DATABASE", "false").lower() == "true"
+    update_existing_collections: bool = os.getenv("UPDATE_EXISTING_COLLECTIONS", "false").lower() == "true"
 
     # Database
     db_engine_echo: bool = os.getenv("DATABASE_ENGINE_ECHO", "false") == "true"
