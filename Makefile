@@ -5,7 +5,7 @@ all: format check coverage
 .PHONY: init-dev
 init-dev:
 	rye self update
-	rye sync --update-all
+	rye sync --no-lock
 	pre-commit install
 	pre-commit run --all-files
 
