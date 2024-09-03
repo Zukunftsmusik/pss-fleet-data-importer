@@ -37,7 +37,7 @@ async def test_log_import_on_success(
     with caplog.at_level(logging.INFO):
         await update_collection(fake_pss_fleet_data_client, queue_item)
 
-    assert "imported" in caplog.text.lower()
+    assert "updated" in caplog.text.lower()
 
 
 async def test_log_skip_on_conflict_error(
