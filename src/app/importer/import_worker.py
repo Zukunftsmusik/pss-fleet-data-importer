@@ -49,7 +49,7 @@ async def do_import(
         log.file_import_api_error(queue_item.item_no, queue_item.gdrive_file.name, exc)
         queue_item.status.import_error.value = True
     else:
-        collection_exists = True
+        queue_item.status.imported.value = True
 
     if collection_exists:
         if update_existing_collections:
@@ -115,7 +115,7 @@ async def update_collection(
             import_error = exc
             log.file_import_error(queue_item.item_no, queue_item.target_file_path, exc)
         else:
-            log.file_import_completed(queue_item.item_no, queue_item.target_file_path, collection_metadata.collection_id)
+            log.file_import_update_completed(queue_item.item_no, queue_item.target_file_path, collection_metadata.collection_id)
             return
 
         await asyncio.sleep(2 ^ attempt)

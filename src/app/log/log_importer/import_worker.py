@@ -34,6 +34,10 @@ def file_import_completed(item_no: int, file_path: Union[Path, str], collection_
     LOGGER.info("Imported file no. %i (Collection ID: %i): %s", item_no, collection_id, file_path)
 
 
+def file_import_update_completed(item_no: int, file_path: Union[Path, str], collection_id: int):
+    LOGGER.info("Updated file no. %i (Collection ID: %i): %s", item_no, collection_id, file_path)
+
+
 def import_start(file_no: int, file_path: Union[Path, str]):
     LOGGER.debug("Importing file no. %i: %s", file_no, file_path)
 
