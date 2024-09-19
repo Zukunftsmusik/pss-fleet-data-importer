@@ -1,6 +1,6 @@
 [project]
 name = "pss-fleet-data-importer"
-version = "0.3.1"
+version = "0.3.2"
 description = "A tool to import PSS Fleet Data from google drive to the PSS Fleet Data API."
 authors = [
     { name = "The worst.", email = "theworstpss@gmail.com" }
@@ -10,7 +10,7 @@ dependencies = [
     "asyncpg>=0.29.0",
     "cancel-token>=0.1.6",
     "pssapi>=0.5.1",
-    "pss-fleet-data-client>=0.5.0",
+    "pss-fleet-data-client>=0.6.0",
     "psycopg2-binary>=2.9.9",
     "PyDrive2>=1.20.0",
     "python-dateutil>=2.9.0.post0",
